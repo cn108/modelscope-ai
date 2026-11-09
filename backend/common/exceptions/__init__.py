@@ -1,6 +1,16 @@
 """Consistent API error shape (specification section 8)."""
 
+from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.views import exception_handler
+
+
+class Conflict(APIException):
+    """HTTP 409 for uniqueness conflicts that are not validation errors."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "Resource already exists."
+    default_code = "conflict"
 
 
 def api_exception_handler(exc, context):
@@ -14,8 +24,11 @@ def api_exception_handler(exc, context):
     if isinstance(data, dict) and "detail" in data:
         message = str(data["detail"])
         detail = None
-    else:
+    elif isinstance(data, dict):
         detail = data
+    else:
+        message = str(data)
+        detail = None
     response.data = {
         "error": {
             "code": code,

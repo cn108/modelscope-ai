@@ -4,6 +4,7 @@ Business logic lives here, not in views (§1 agent rules).
 """
 
 from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
@@ -31,10 +32,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
 def register_user(*, email: str, password: str, display_name: str = "") -> User:
     """Create a user atomically; normalise email case (§7 integrity)."""
     email = email.strip().lower()
+    if User.objects.filter(email=email).exists():
+        raise ValueError("An account with this email already exists.")
     try:
         with transaction.atomic():
             return User.objects.create_user(
                 email=email, password=password, display_name=display_name.strip()
             )
-    except IntegrityError as exc:
+    except (IntegrityError, DjangoValidationError) as exc:
         raise ValueError("An account with this email already exists.") from exc

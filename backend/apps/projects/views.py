@@ -1,0 +1,83 @@
+"""Project API (specification §8: /projects)."""
+
+from rest_framework import mixins, status, viewsets
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from apps.projects.serializers import (
+    ProjectCreateSerializer,
+    ProjectSerializer,
+    ProjectUpdateSerializer,
+)
+from apps.projects.services import (
+    create_project,
+    delete_project,
+    list_projects,
+    projects_for_user,
+    update_project,
+)
+from apps.workspaces.permissions import UUID_RE
+
+
+class ProjectViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    permission_classes = [IsAuthenticated]
+    lookup_value_regex = UUID_RE
+
+    def get_queryset(self):
+        return projects_for_user(self.request.user)
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return ProjectCreateSerializer
+        if self.action in {"update", "partial_update"}:
+            return ProjectUpdateSerializer
+        return ProjectSerializer
+
+    def list(self, request, *args, **kwargs):
+        projects = list_projects(
+            user=request.user, workspace_id=request.query_params.get("workspace")
+        )
+        page = self.paginate_queryset(projects)
+        if page is not None:
+            return self.get_paginated_response(
+                ProjectSerializer(page, many=True).data
+            )
+        return Response(ProjectSerializer(projects, many=True).data)
+
+    def create(self, request, *args, **kwargs):
+        serializer = ProjectCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        project = create_project(
+            user=request.user,
+            workspace_id=data["workspace"],
+            name=data["name"],
+            description=data.get("description", ""),
+        )
+        return Response(
+            ProjectSerializer(project).data, status=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        project = self.get_object()
+        serializer = ProjectUpdateSerializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        project = update_project(
+            user=request.user,
+            project=project,
+            validated_data=serializer.validated_data,
+        )
+        return Response(ProjectSerializer(project).data)
+
+    def destroy(self, request, *args, **kwargs):
+        project = self.get_object()
+        delete_project(user=request.user, project=project)
+        return Response(status=status.HTTP_204_NO_CONTENT)
