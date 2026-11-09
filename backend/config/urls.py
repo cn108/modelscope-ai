@@ -4,24 +4,36 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from rest_framework.routers import DefaultRouter
 
+from apps.projects.views import ProjectViewSet
+from apps.workspaces.views import WorkspaceViewSet
 from common.health.views import HealthView, WorkerHealthView
+
+router = DefaultRouter()
+router.register("workspaces", WorkspaceViewSet, basename="workspace")
+router.register("projects", ProjectViewSet, basename="project")
 
 
 def api_not_found(request, exception=None):
     """Keep the JSON error envelope consistent even for unrouted /api/ paths (§8)."""
     return JsonResponse(
-        {"error": {"code": "not_found", "message": "Endpoint not found.", "details": None}},
+        {
+            "error": {
+                "code": "not_found",
+                "message": "Endpoint not found.",
+                "details": None,
+            }
+        },
         status=404,
     )
+
 
 api_v1_patterns = [
     path("health/", HealthView.as_view(), name="health"),
     path("health/worker/", WorkerHealthView.as_view(), name="health-worker"),
-    # Feature routes are added from Milestone 2 onward:
-    # path("auth/", include("apps.accounts.urls")),
-    # path("workspaces/", include("apps.workspaces.urls")),
-    # ...
+    path("auth/", include("apps.accounts.urls")),
+    path("", include(router.urls)),
 ]
 
 urlpatterns = [

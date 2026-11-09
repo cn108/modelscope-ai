@@ -8,6 +8,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.models import User
@@ -85,7 +87,19 @@ class RefreshView(APIView):
 
     def post(self, request: Request) -> Response:
         serializer = TokenRefreshSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            return Response(
+                {
+                    "error": {
+                        "code": "invalid_token",
+                        "message": str(exc),
+                        "details": None,
+                    }
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
         return Response(serializer.validated_data)
 
 
