@@ -7,7 +7,10 @@ from rest_framework.response import Response
 
 from apps.datasets.serializers import DatasetCreateSerializer, DatasetSerializer
 from apps.datasets.services import create_dataset, get_dataset, list_datasets
-from apps.evaluations.serializers import EvaluationCreateSerializer, EvaluationSerializer
+from apps.evaluations.serializers import (
+    EvaluationCreateSerializer,
+    EvaluationSerializer,
+)
 from apps.evaluations.services import (
     create_evaluation,
     enqueue_evaluation,
@@ -16,10 +19,6 @@ from apps.evaluations.services import (
 )
 from apps.playground.serializers import ExecutionCreateSerializer, ExecutionSerializer
 from apps.playground.services import create_execution, list_executions
-from apps.prompts.serializers import PromptCreateSerializer, PromptSerializer
-from apps.prompts.services import create_prompt, list_prompts
-from apps.providers.serializers import ProviderConfigSerializer, ProviderCreateSerializer
-from apps.providers.services import create_provider, list_providers
 from apps.projects.serializers import (
     ProjectCreateSerializer,
     ProjectSerializer,
@@ -32,7 +31,15 @@ from apps.projects.services import (
     projects_for_user,
     update_project,
 )
+from apps.prompts.serializers import PromptCreateSerializer, PromptSerializer
+from apps.prompts.services import create_prompt, list_prompts
+from apps.providers.serializers import (
+    ProviderConfigSerializer,
+    ProviderCreateSerializer,
+)
+from apps.providers.services import create_provider, list_providers
 from apps.workspaces.permissions import UUID_RE
+from common.throttling import EvaluationCreateRateThrottle, ModelCallRateThrottle
 
 
 class ProjectViewSet(
@@ -48,6 +55,14 @@ class ProjectViewSet(
 
     def get_queryset(self):
         return projects_for_user(self.request.user)
+
+    def get_throttles(self):
+        throttle_classes = []
+        if self.request.method == "POST" and self.action == "executions":
+            throttle_classes = [ModelCallRateThrottle]
+        elif self.request.method == "POST" and self.action == "evaluations":
+            throttle_classes = [EvaluationCreateRateThrottle]
+        return [throttle() for throttle in throttle_classes]
 
     def get_serializer_class(self):
         if self.action == "create":

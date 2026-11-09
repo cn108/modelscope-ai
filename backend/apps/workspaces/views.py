@@ -1,10 +1,12 @@
 """Workspace API (specification §8: /workspaces, /workspaces/{id}/members)."""
 
+from django.http import JsonResponse
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.workspaces.export import export_workspace
 from apps.workspaces.permissions import UUID_RE
 from apps.workspaces.serializers import (
     AddMemberSerializer,
@@ -18,12 +20,14 @@ from apps.workspaces.services import (
     add_member,
     create_workspace,
     delete_workspace,
+    list_audit_events,
     list_members,
     remove_member,
     update_member_role,
     update_workspace,
     workspaces_for_user,
 )
+from common.audit.serializers import AuditEventSerializer
 
 
 class WorkspaceViewSet(
@@ -78,6 +82,25 @@ class WorkspaceViewSet(
     def destroy(self, request, *args, **kwargs):
         delete_workspace(user=request.user, workspace_id=kwargs["pk"])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"], url_path="audit")
+    def audit(self, request, pk=None):
+        events = list_audit_events(user=request.user, workspace_id=pk)
+        page = self.paginate_queryset(events)
+        if page is not None:
+            return self.get_paginated_response(
+                AuditEventSerializer(page, many=True).data
+            )
+        return Response(AuditEventSerializer(events, many=True).data)
+
+    @action(detail=True, methods=["get"], url_path="export")
+    def export(self, request, pk=None):
+        payload = export_workspace(user=request.user, workspace_id=pk)
+        response = JsonResponse(payload, json_dumps_params={"indent": 2})
+        response["Content-Disposition"] = (
+            f'attachment; filename="modelscope-workspace-{pk}.json"'
+        )
+        return response
 
     @action(detail=True, methods=["get", "post"], url_path="members")
     def members(self, request, pk=None):

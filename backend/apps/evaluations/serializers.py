@@ -1,6 +1,11 @@
 from rest_framework import serializers
 
-from apps.evaluations.models import Evaluation, EvaluationModel, EvaluationResult
+from apps.evaluations.models import (
+    Evaluation,
+    EvaluationModel,
+    EvaluationResult,
+    EvaluationReview,
+)
 from apps.prompts.serializers import validate_parameters
 
 
@@ -82,10 +87,35 @@ class EvaluationModelSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class EvaluationReviewSerializer(serializers.ModelSerializer):
+    reviewer_email = serializers.EmailField(
+        source="reviewer.email", read_only=True, default=""
+    )
+
+    class Meta:
+        model = EvaluationReview
+        fields = [
+            "id",
+            "reviewer",
+            "reviewer_email",
+            "label",
+            "note",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class EvaluationReviewInputSerializer(serializers.Serializer):
+    label = serializers.ChoiceField(choices=EvaluationReview.Label.choices)
+    note = serializers.CharField(max_length=2000, required=False, allow_blank=True)
+
+
 class EvaluationSerializer(serializers.ModelSerializer):
     models = EvaluationModelSerializer(many=True, read_only=True)
     judge = serializers.SerializerMethodField()
     total_results = serializers.SerializerMethodField()
+    review_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Evaluation
@@ -97,6 +127,7 @@ class EvaluationSerializer(serializers.ModelSerializer):
             "dataset_version",
             "status",
             "metrics",
+            "metric_versions",
             "parameters",
             "judge",
             "total_cases",
@@ -104,6 +135,7 @@ class EvaluationSerializer(serializers.ModelSerializer):
             "completed_cases",
             "failed_cases",
             "summary",
+            "review_summary",
             "error",
             "created_by",
             "created_at",
@@ -126,8 +158,27 @@ class EvaluationSerializer(serializers.ModelSerializer):
         """Progress is per model/case pair: records multiplied by models."""
         return obj.total_cases * len(obj.models.all())
 
+    def get_review_summary(self, obj) -> dict:
+        reviews = EvaluationReview.objects.filter(result__evaluation=obj)
+        rows = list(reviews.values_list("result_id", "label"))
+        labels = {label for _, label in rows}
+        by_result: dict[str, set[str]] = {}
+        for result_id, label in rows:
+            by_result.setdefault(str(result_id), set()).add(label)
+        multi = [values for values in by_result.values() if len(values) > 1]
+        return {
+            "total_reviews": len(rows),
+            "reviewed_results": len(by_result),
+            "labels": {label: sum(1 for _, value in rows if value == label) for label in labels},
+            "disagreements": len(multi),
+            "agreement_rate": (
+                round(1 - len(multi) / len(by_result), 4) if by_result else None
+            ),
+        }
+
 
 class EvaluationResultSerializer(serializers.ModelSerializer):
+    reviews = EvaluationReviewSerializer(many=True, read_only=True)
     model = serializers.UUIDField(read_only=True)
     model_id = serializers.CharField(source="model.model_id", read_only=True)
     provider_name = serializers.CharField(source="model.provider_name", read_only=True)
@@ -152,6 +203,7 @@ class EvaluationResultSerializer(serializers.ModelSerializer):
             "status",
             "scores",
             "metric_results",
+            "reviews",
             "error",
             "created_at",
             "updated_at",
@@ -168,3 +220,4 @@ class EvaluationMetricCatalogSerializer(serializers.Serializer):
     requires_judge = serializers.BooleanField()
     threshold = serializers.FloatField(allow_null=True)
     source = serializers.CharField()
+    version = serializers.CharField()

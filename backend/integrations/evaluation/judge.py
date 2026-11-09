@@ -6,11 +6,11 @@ the playground, so evaluation never introduces a second provider path.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
 import os
 import re
 import time
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 os.environ.setdefault("DEEPEVAL_TELEMETRY_OPT_OUT", "YES")

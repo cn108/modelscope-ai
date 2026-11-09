@@ -7,6 +7,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from apps.accounts.models import User
 from apps.workspaces.models import Membership, Workspace
 from apps.workspaces.permissions import parse_uuid, require_membership
+from common.audit.models import AuditEvent
 from common.audit.services import record_event
 from common.exceptions import Conflict
 
@@ -80,6 +81,16 @@ def delete_workspace(*, user, workspace_id) -> None:
         target_id=workspace.pk,
     )
     workspace.delete()
+
+
+def list_audit_events(*, user, workspace_id):
+    """Workspace activity, visible to admins and the owner only."""
+    workspace, _ = require_membership(user, workspace_id, Membership.Role.ADMIN)
+    return (
+        AuditEvent.objects.filter(workspace=workspace)
+        .select_related("actor")
+        .order_by("-created_at")
+    )
 
 
 def list_members(*, user, workspace_id):

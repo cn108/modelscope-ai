@@ -7,8 +7,8 @@ positives/negatives are expected.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from .base import (
     SEVERITY_CRITICAL,

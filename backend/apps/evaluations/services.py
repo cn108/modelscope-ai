@@ -7,9 +7,9 @@ a metric never requires touching this module or any page.
 
 from __future__ import annotations
 
+import time
 from datetime import timedelta
 from statistics import mean
-import time
 from typing import Any
 
 from django.db import transaction
@@ -29,8 +29,10 @@ from apps.workspaces.models import Membership
 from apps.workspaces.permissions import require_membership
 from integrations.evaluation.registry import (
     MetricDefinition,
-    evaluate as evaluate_metric,
     resolve_metrics,
+)
+from integrations.evaluation.registry import (
+    evaluate as evaluate_metric,
 )
 from integrations.telemetry.tracing import model_call_span
 
@@ -155,6 +157,9 @@ def create_evaluation(*, actor, project_id, validated_data) -> Evaluation:
         dataset_name=dataset.name,
         dataset_version=dataset.version,
         metrics=[definition.key for definition in definitions],
+        metric_versions={
+            definition.key: definition.version for definition in definitions
+        },
         parameters=parameters,
         judge_provider=judge_provider,
         judge_provider_name=judge_provider.name if judge_provider else "",
@@ -727,6 +732,7 @@ def _finalize(evaluation: Evaluation, model_summaries: list[dict], judge) -> Non
     )
     evaluation.summary = {
         "metrics": evaluation.metrics,
+        "metric_versions": evaluation.metric_versions,
         "models": model_summaries,
         "totals": totals,
         "judge": (
@@ -817,6 +823,7 @@ def rerun_evaluation(*, actor, evaluation_id) -> Evaluation:
         dataset_name=source.dataset_name,
         dataset_version=source.dataset_version,
         metrics=source.metrics,
+        metric_versions=source.metric_versions,
         metric_options=source.metric_options,
         parameters=source.parameters,
         judge_provider=source.judge_provider,

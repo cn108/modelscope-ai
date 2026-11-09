@@ -1,9 +1,10 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { catchError, forkJoin, map, of } from 'rxjs';
 
 import { apiErrorMessage } from '../../shared/api-error';
+import { AuthService } from '../../core/authentication/auth.service';
 import {
   Membership,
   Project,
@@ -36,7 +37,7 @@ const WORKSPACE_TONES = [
   standalone: true,
   imports: [
     ReactiveFormsModule,
-    DatePipe,
+    LocalDatePipe,
     IconComponent,
     ProviderManagerComponent,
   ],
@@ -389,7 +390,7 @@ const WORKSPACE_TONES = [
                             }
                           </td>
                           <td class="msa-td text-xs text-slate-400">
-                            {{ project.created_at | date: 'mediumDate' }}
+                            {{ project.created_at | msaDate: 'mediumDate' }}
                           </td>
                           <td class="msa-td text-right">
                             <button
@@ -529,6 +530,7 @@ export class WorkspacesComponent implements OnInit {
   private readonly workspaceService = inject(WorkspaceService);
   private readonly projectService = inject(ProjectService);
   private readonly providerService = inject(ProviderService);
+  private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
 
   readonly workspaces = signal<Workspace[]>([]);
@@ -800,8 +802,16 @@ export class WorkspacesComponent implements OnInit {
     this.workspaceService.list().subscribe({
       next: (page) => {
         this.workspaces.set(page.results);
+        const preferred = this.auth.user()?.preferences?.default_workspace;
         const targetId =
-          selectId ?? this.selected()?.id ?? page.results[0]?.id ?? null;
+          selectId ??
+          this.selected()?.id ??
+          (preferred &&
+          page.results.some((candidate) => candidate.id === preferred)
+            ? preferred
+            : null) ??
+          page.results[0]?.id ??
+          null;
         const workspace =
           page.results.find((candidate) => candidate.id === targetId) ??
           page.results[0] ??

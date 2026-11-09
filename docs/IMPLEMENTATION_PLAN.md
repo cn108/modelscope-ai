@@ -43,15 +43,13 @@ responses, deterministic pass/fail/inconclusive classification, model and
 historical comparison, and integration with M7 security counts and M8
 analytics/reporting; see [MILESTONE-9.md](milestones/MILESTONE-9.md).
 
-## 3. Environment limitation (documented, not hidden)
+## 3. Docker acceptance (completed 2026-11-09)
 
-The Docker CLI is present, but the daemon is **not reachable from this development sandbox**
-(`permission denied` on the Docker socket), so `docker compose up` cannot be executed here. Mitigations:
-
-- SQLite is used **only** for hermetic unit/API tests; integration paths still target PostgreSQL as the source of truth.
-- Compose files, Dockerfiles and healthchecks are written to spec and validated statically; a full
-  Compose start is still required on a Docker host.
-- Verification reports state exactly which commands ran natively and which require a Docker host.
+Docker Desktop `29.9.2` became available during acceptance. The current working tree was
+built and started with Compose; PostgreSQL migrations, Redis/Celery, worker failure
+recovery, browser smoke and backup/restore passed. Evidence is in
+[HANDOVER.md](HANDOVER.md#verification-evidence). SQLite is used **only** for
+hermetic unit/API tests; live PostgreSQL remains the source of truth.
 
 ## 4. Assumptions & defaults
 
@@ -83,22 +81,23 @@ docs/{IMPLEMENTATION_PLAN.md, milestones/, adr/}
 
 | Check | Command | Status |
 |---|---|---|
-| Migrations apply cleanly | `python manage.py migrate --settings=config.settings.test` | pass on SQLite test DB; live PostgreSQL unverified |
-| DB connectivity via health | `pytest tests/test_health.py` | pass |
-| Celery/Redis round trip | `pytest tests/test_health.py` (eager mode); M5/M6 live checks used a real worker over the filesystem broker | partial — real worker exercised; live Redis/PostgreSQL pending a host |
-| Backend tests | `pytest` | pass — 159 passed |
+| Migrations apply cleanly | `python manage.py migrate --settings=config.settings.test`; live Compose migration | pass on SQLite; live PostgreSQL applied the full migration set on 2026-11-09 |
+| DB connectivity via health | `pytest tests/test_health.py`; live `/api/v1/health/` | pass; live health reported PostgreSQL `ok` |
+| Celery/Redis round trip | `pytest tests/test_health.py` (eager mode); live worker probe | pass; live Redis was reachable and worker reply `ping` was verified on 2026-11-09 |
+| Backend tests | `pytest` | pass — 176 passed |
 | Frontend builds | `npx ng build` | pass |
 | Frontend specs | `npx ng test --watch=false --browsers=ChromeHeadless` | pass — 23 specs |
 | No secrets committed | `git ls-files` + secret grep scan | pass — no `.env` tracked |
-| README and `.env.example` | file existence | partial — `.env.example` added; full README outstanding |
-| CI workflow | `.github/workflows/ci.yml` | present — Django and Angular jobs, green on `main` |
+| README and `.env.example` | file existence | complete — README and the `docs/` handover suite are present; `.env.example` documents required and optional variables |
+| CI workflow | `.github/workflows/ci.yml` | present — backend/frontend quality jobs plus the full Docker/Ollama Playwright job |
 
 ## 7. Milestone status
 
 ### Milestone 1 — Foundation
 
-Status: **code complete; handover partial.** Backend boots, migrations apply, smoke tests pass and
-the Angular production build succeeds. The live Compose stack, CI workflow and full README remain outstanding.
+Status: **complete against exit criteria.** Backend boots, migrations apply, smoke tests
+pass and the Angular production build succeeds. README/handover documentation and CI are
+present; the live Compose/PostgreSQL/Redis stack passed acceptance on 2026-11-09.
 
 ### Milestone 2 — Identity/tenancy
 
@@ -169,7 +168,7 @@ missing rather than being shown as zero. The Angular analytics page includes
 trends, model comparison, cost breakdowns, evaluation/security history and
 report generation. Full report: [MILESTONE-8.md](milestones/MILESTONE-8.md).
 
-### Milestone 9 — AI security testing
+### Milestone 9 — AI security testing (repository numbering)
 
 Status: **implemented, automated-test verified and live-tested against a real
 configured model.** The engine sends reviewed cases across nine attack
@@ -185,3 +184,19 @@ without duplicating their stores. Live acceptance used Ollama `0.40.13` with
 responses exposed and fixed a quoted-marker false positive and a refusal
 phrasing gap; a clean rerun and historical comparison confirmed the correction.
 Full report: [MILESTONE-9.md](milestones/MILESTONE-9.md).
+
+**This is not the specification's Milestone 9.** The specification defines Milestone 9 as
+Hardening: performance, security review, documentation, backups, a deployment profile and a full
+regression suite. That work is tracked in [HANDOVER.md](HANDOVER.md); the code/configuration is
+implemented, while production promotion still needs a host, TLS and operator secrets. See
+[ADR-0004](adr/ADR-0004-milestone-9-scope.md).
+
+## 8. Documentation handover
+
+The specification §15 documentation set is now in `README.md` and `docs/`:
+architecture, API examples, data model/migrations, provider setup, evaluation definitions and
+limitations, security/privacy/retention, operations/backups, testing, troubleshooting, milestone
+status and ADRs. The README is no longer a placeholder. Operational acceptance evidence now
+includes the live Docker/PostgreSQL/Redis run, backup/restore, OTLP collector export and the
+full Playwright journey. Rate limiting, scheduled backups, quality gates and the production
+profile are now implemented; live Z.ai and a production host remain operator-dependent.

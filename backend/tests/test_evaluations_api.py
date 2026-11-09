@@ -1,6 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
+from apps.accounts.models import User
 from apps.datasets.models import Dataset, DatasetRecord
 from apps.evaluations.models import Evaluation, EvaluationResult
 from apps.evaluations.services import create_evaluation
@@ -510,6 +511,53 @@ def test_create_evaluation_service_snapshots_every_model(
     assert evaluation.dataset_version == dataset.version
     assert evaluation.parameters == {"max_tokens": 64}
     assert evaluation.models.first().parameters == {}
+
+
+def test_human_reviews_and_disagreement_summary(
+    owner_client, user, other_user, project, dataset, provider, fake_provider
+):
+    evaluation = start(owner_client, project, dataset, provider).json()
+    row = results(owner_client, evaluation["id"]).json()["results"][0]
+    url = f"/api/v1/evaluations/{evaluation['id']}/results/{row['id']}/reviews/"
+
+    first = owner_client.post(
+        url, {"label": "pass", "note": "Looks correct."}, format="json"
+    )
+    assert first.status_code == 200, first.content
+    assert first.json()["reviewer_email"] == user.email
+
+    add_member(
+        actor=user,
+        workspace_id=project.workspace_id,
+        email=other_user.email,
+        role=Membership.Role.MEMBER,
+    )
+    second_client = APIClient()
+    second_client.force_authenticate(user=other_user)
+    second = second_client.post(
+        url, {"label": "fail", "note": "The answer is incomplete."}, format="json"
+    )
+    assert second.status_code == 200, second.content
+
+    reviews = owner_client.get(url).json()
+    assert {item["label"] for item in reviews} == {"pass", "fail"}
+    detail = owner_client.get(f"/api/v1/evaluations/{evaluation['id']}/").json()
+    assert detail["review_summary"]["disagreements"] == 1
+    assert detail["review_summary"]["agreement_rate"] == 0.0
+
+    viewer_client = APIClient()
+    viewer = User.objects.create_user(
+        email="review-viewer@example.com", password="Str0ng-Passw0rd!"
+    )
+    add_member(
+        actor=user,
+        workspace_id=project.workspace_id,
+        email=viewer.email,
+        role=Membership.Role.VIEWER,
+    )
+    viewer_client.force_authenticate(user=viewer)
+    denied = viewer_client.post(url, {"label": "pass"}, format="json")
+    assert denied.status_code == 403
 
 
 def test_evaluations_are_listed_newest_first(

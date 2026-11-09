@@ -1,0 +1,38 @@
+groups:
+  - name: modelscope-availability
+    rules:
+      - alert: ModelScopeApiDown
+        expr: probe_success{job="modelscope-health", instance=~".*/api/v1/health/$"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: ModelScope API health endpoint is failing
+          runbook: docs/OPERATIONS.md#monitoring-and-alerting
+
+      - alert: ModelScopeWorkerUnavailable
+        expr: probe_success{job="modelscope-health", instance=~".*/api/v1/health/worker/$"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Celery worker or broker is unavailable
+          runbook: docs/OPERATIONS.md#monitoring-and-alerting
+
+      - alert: ModelScopeFrontendDown
+        expr: probe_success{job="modelscope-health", instance=~".*frontend.*"} == 0
+        for: 2m
+        labels:
+          severity: high
+        annotations:
+          summary: The frontend is not serving HTTP
+          runbook: docs/OPERATIONS.md#monitoring-and-alerting
+
+      - alert: ModelScopeProbeMissing
+        expr: absent(probe_success{job="modelscope-health"})
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Health probes have stopped reporting
+          runbook: docs/OPERATIONS.md#monitoring-and-alerting

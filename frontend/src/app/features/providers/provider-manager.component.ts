@@ -54,7 +54,7 @@ import {
       @if (formOpen() && canManage) {
         <form
           [formGroup]="form"
-          (ngSubmit)="create()"
+          (ngSubmit)="submit()"
           class="mt-4 rounded-xl border border-line bg-canvas p-4"
         >
           <div class="grid gap-3 sm:grid-cols-2">
@@ -73,15 +73,17 @@ import {
               <select
                 id="provider-kind"
                 formControlName="kind"
+                [disabled]="editingId() !== null"
                 (change)="kindChanged()"
-                class="msa-input"
+                class="msa-input disabled:bg-slate-50"
               >
                 <option value="ollama">Ollama (local)</option>
+                <option value="lmstudio">LM Studio (local)</option>
                 <option value="zai">Z.ai (cloud)</option>
               </select>
             </div>
 
-            @if (form.controls.kind.value === 'ollama') {
+            @if (form.controls.kind.value !== 'zai') {
               <div class="sm:col-span-2">
                 <label class="msa-label" for="provider-endpoint">
                   Endpoint
@@ -90,23 +92,37 @@ import {
                   id="provider-endpoint"
                   formControlName="endpoint"
                   type="text"
-                  placeholder="http://host.docker.internal:11434/api"
+                  [placeholder]="
+                    form.controls.kind.value === 'ollama'
+                      ? 'http://host.docker.internal:11434/api'
+                      : 'http://host.docker.internal:1234/v1'
+                  "
                   class="msa-input"
                 />
                 <p class="mt-1 text-[11px] text-slate-400">
-                  Only loopback, <code>host.docker.internal</code> and private
-                  Docker hosts on port 11434 are accepted.
+                  Only loopback and <code>host.docker.internal</code> hosts are
+                  accepted; Ollama uses port 11434 and LM Studio uses 1234.
                 </p>
               </div>
-            } @else {
+            }
+            @if (form.controls.kind.value !== 'ollama') {
               <div class="sm:col-span-2">
-                <label class="msa-label" for="provider-key">API key</label>
+                <label class="msa-label" for="provider-key">
+                  API key
+                  @if (form.controls.kind.value === 'lmstudio') {
+                    <span class="font-normal text-slate-400">(optional)</span>
+                  }
+                </label>
                 <input
                   id="provider-key"
                   formControlName="api_key"
                   type="password"
                   autocomplete="new-password"
-                  placeholder="Stored encrypted — never returned by the API"
+                  [placeholder]="
+                    editingId()
+                      ? 'Leave blank to keep the stored credential'
+                      : 'Stored encrypted — never returned by the API'
+                  "
                   class="msa-input"
                 />
               </div>
@@ -117,12 +133,13 @@ import {
             <button
               type="button"
               class="msa-btn-secondary"
-              (click)="formOpen.set(false)"
+              (click)="closeForm()"
             >
               Cancel
             </button>
             <button type="submit" [disabled]="busy()" class="msa-btn-primary">
-              <msa-icon name="plus" [size]="15" /> Add provider
+              <msa-icon [name]="editingId() ? 'check' : 'plus'" [size]="15" />
+              {{ editingId() ? 'Save changes' : 'Add provider' }}
             </button>
           </div>
         </form>
@@ -150,10 +167,18 @@ import {
                   [class]="
                     provider.kind === 'zai'
                       ? 'bg-gradient-to-br from-violet to-brand'
-                      : 'bg-gradient-to-br from-amber-400 to-orange-500'
+                      : provider.kind === 'lmstudio'
+                        ? 'bg-gradient-to-br from-sky-500 to-cyan-500'
+                        : 'bg-gradient-to-br from-amber-400 to-orange-500'
                   "
                 >
-                  {{ provider.kind === 'zai' ? 'Z' : 'O' }}
+                  {{
+                    provider.kind === 'zai'
+                      ? 'Z'
+                      : provider.kind === 'lmstudio'
+                        ? 'L'
+                        : 'O'
+                  }}
                 </span>
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium text-ink">
@@ -161,7 +186,7 @@ import {
                   </p>
                   <p class="text-[11px] uppercase tracking-wide text-slate-400">
                     {{ provider.kind === 'zai' ? 'Cloud' : 'Local' }} ·
-                    {{ provider.kind }}
+                    {{ provider.kind === 'lmstudio' ? 'LM Studio' : provider.kind }}
                   </p>
                 </div>
                 <span class="msa-badge shrink-0" [class]="statusClass(provider)">
@@ -194,6 +219,14 @@ import {
 
               @if (canManage) {
                 <div class="mt-4 flex items-center gap-1 border-t border-line pt-3">
+                  <button
+                    type="button"
+                    class="msa-btn-ghost"
+                    [disabled]="busy()"
+                    (click)="startEdit(provider)"
+                  >
+                    <msa-icon name="edit" [size]="13" /> Edit
+                  </button>
                   <button
                     type="button"
                     class="msa-btn-ghost"
@@ -263,10 +296,11 @@ export class ProviderManagerComponent implements OnInit, OnChanges {
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
   readonly formOpen = signal(false);
+  readonly editingId = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
-    kind: this.fb.nonNullable.control<'ollama' | 'zai'>('ollama'),
+    kind: this.fb.nonNullable.control<'ollama' | 'lmstudio' | 'zai'>('ollama'),
     endpoint: ['http://host.docker.internal:11434/api'],
     api_key: [''],
   });
@@ -277,22 +311,53 @@ export class ProviderManagerComponent implements OnInit, OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['projectId'] && !changes['projectId'].firstChange) {
-      this.formOpen.set(false);
+      this.closeForm();
       this.models.set({});
+      this.editingId.set(null);
       this.load();
     }
   }
 
   toggleForm(): void {
-    this.formOpen.update((open) => !open);
+    if (this.formOpen()) {
+      this.closeForm();
+      return;
+    }
+    this.formOpen.set(true);
     this.error.set(null);
+  }
+
+  closeForm(): void {
+    this.formOpen.set(false);
+    this.editingId.set(null);
+    this.error.set(null);
+    this.form.reset({
+      name: '',
+      kind: 'ollama',
+      endpoint: 'http://host.docker.internal:11434/api',
+      api_key: '',
+    });
+  }
+
+  startEdit(provider: ProviderConfig): void {
+    this.editingId.set(provider.id);
+    this.formOpen.set(true);
+    this.error.set(null);
+    this.form.reset({
+      name: provider.name,
+      kind: provider.kind,
+      endpoint: provider.endpoint,
+      api_key: '',
+    });
   }
 
   kindChanged(): void {
     this.form.controls.endpoint.setValue(
       this.form.controls.kind.value === 'ollama'
         ? 'http://host.docker.internal:11434/api'
-        : '',
+        : this.form.controls.kind.value === 'lmstudio'
+          ? 'http://host.docker.internal:1234/v1'
+          : '',
     );
   }
 
@@ -330,7 +395,7 @@ export class ProviderManagerComponent implements OnInit, OnChanges {
     return 'bg-slate-400';
   }
 
-  create(): void {
+  submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -342,22 +407,27 @@ export class ProviderManagerComponent implements OnInit, OnChanges {
       settings: {},
       ...(value.kind === 'ollama'
         ? { endpoint: value.endpoint.trim() }
-        : { api_key: value.api_key }),
+        : {
+            endpoint: value.endpoint.trim(),
+            ...(value.api_key ? { api_key: value.api_key } : {}),
+          }),
     };
     this.busy.set(true);
     this.error.set(null);
-    this.service.create(this.projectId, input).subscribe({
+    const editingId = this.editingId();
+    const request = editingId
+      ? this.service.update(editingId, input)
+      : this.service.create(this.projectId, input);
+    request.subscribe({
       next: (provider) => {
-        const next = [...this.providers(), provider];
+        const next = editingId
+          ? this.providers().map((item) =>
+              item.id === provider.id ? provider : item,
+            )
+          : [...this.providers(), provider];
         this.providers.set(next);
         this.changed.emit(next);
-        this.form.reset({
-          name: '',
-          kind: 'ollama',
-          endpoint: 'http://host.docker.internal:11434/api',
-          api_key: '',
-        });
-        this.formOpen.set(false);
+        this.closeForm();
         this.busy.set(false);
       },
       error: (error: unknown) => this.fail(error),

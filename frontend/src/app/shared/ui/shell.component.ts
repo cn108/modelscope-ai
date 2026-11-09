@@ -14,11 +14,6 @@ interface NavItem {
   icon: IconName;
 }
 
-interface SoonItem {
-  label: string;
-  icon: IconName;
-}
-
 @Component({
   selector: 'msa-shell',
   standalone: true,
@@ -27,101 +22,113 @@ interface SoonItem {
     <div class="min-h-screen bg-canvas">
       @if (mobileOpen()) {
         <div
-          class="fixed inset-0 z-30 bg-navy/40 backdrop-blur-sm lg:hidden"
+          class="fixed inset-0 z-30 bg-navy/30 backdrop-blur-sm lg:hidden"
+          aria-hidden="true"
           (click)="closeMobile()"
         ></div>
       }
 
       <aside
-        class="fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col bg-navy text-slate-400 transition-transform duration-200 lg:translate-x-0"
+        class="fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col border-r border-line bg-[#f7f7f8] transition-transform duration-200 lg:translate-x-0"
         [class]="mobileOpen() ? 'translate-x-0' : '-translate-x-full'"
       >
-        <div class="flex items-center gap-3 px-5 pb-4 pt-5">
+        <div class="flex h-16 items-center gap-3 px-4">
           <span
-            class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-violet text-lg font-bold text-white shadow-lg shadow-brand/30"
+            class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-violet text-base font-bold text-white shadow-sm shadow-brand/20"
           >
             M
           </span>
           <span class="leading-tight">
-            <span class="block tracking-tight text-[15px] font-semibold text-white">
+            <span class="block text-[14px] font-semibold tracking-tight text-ink">
               ModelScope AI
             </span>
-            <span class="block text-[11px] text-slate-500">
-              Evaluate · Monitor
+            <span class="block text-[10px] text-slate-400">
+              Evaluate · Monitor · Improve
             </span>
           </span>
           <button
             type="button"
-            class="ml-auto rounded-lg p-1.5 text-slate-500 hover:bg-white/10 hover:text-white lg:hidden"
+            class="msa-icon-btn ml-auto lg:hidden"
             title="Close navigation"
+            aria-label="Close navigation"
             (click)="closeMobile()"
           >
             <msa-icon name="close" [size]="16" />
           </button>
         </div>
 
-        <nav class="flex-1 overflow-y-auto px-3 pb-4">
+        <nav class="flex-1 overflow-y-auto px-3 pb-4" aria-label="Main navigation">
           <p
-            class="px-3 pb-2 pt-2 text-[10px] font-semibold uppercase tracking-widest text-slate-600"
+            class="px-3 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400"
           >
             Workspace
           </p>
-          @for (item of navItems; track item.path) {
+          @for (item of primaryNav; track item.path) {
             <a
               [routerLink]="item.path"
-              routerLinkActive="bg-brand text-white shadow-sm shadow-brand/30"
-              class="mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+              routerLinkActive="bg-white text-ink shadow-sm ring-1 ring-line/80"
+              class="mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-white/70 hover:text-ink"
               (click)="closeMobile()"
             >
-              <msa-icon [name]="item.icon" [size]="17" />
+              <msa-icon [name]="item.icon" [size]="17" class="shrink-0" />
               <span>{{ item.label }}</span>
             </a>
           }
 
           <p
-            class="px-3 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-widest text-slate-600"
+            class="px-3 pb-2 pt-6 text-[10px] font-semibold uppercase tracking-widest text-slate-400"
           >
-            Coming next
+            Workspace management
           </p>
-          @for (item of soonItems; track item.label) {
-            <div
-              class="mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-slate-600"
-              [attr.title]="item.label + ' arrives in a later milestone'"
+          @for (item of secondaryNav; track item.path) {
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="bg-white text-ink shadow-sm ring-1 ring-line/80"
+              class="mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-white/70 hover:text-ink"
+              (click)="closeMobile()"
             >
-              <msa-icon [name]="item.icon" [size]="17" />
+              <msa-icon [name]="item.icon" [size]="17" class="shrink-0" />
               <span>{{ item.label }}</span>
-              <span
-                class="ml-auto rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500"
-              >
-                Soon
-              </span>
-            </div>
+            </a>
           }
         </nav>
 
-        <div class="border-t border-navy-line px-3 py-3">
-          <div class="flex items-center gap-3 rounded-xl px-2 py-2">
-            <span
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-violet text-xs font-semibold text-white"
-            >
-              {{ initials() }}
-            </span>
-            <span class="min-w-0 flex-1 leading-tight">
-              <span class="block truncate text-[13px] font-medium text-white">
-                {{ displayName() }}
+        <div class="border-t border-line p-3">
+          <div class="rounded-xl bg-white p-2 ring-1 ring-line/80">
+            <div class="flex items-center gap-3 px-1 py-1">
+              <span
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-violet text-[11px] font-semibold text-white"
+              >
+                {{ initials() }}
               </span>
-              <span class="block truncate text-[11px] text-slate-500">
-                {{ email() }}
+              <span class="min-w-0 flex-1 leading-tight">
+                <span class="block truncate text-[13px] font-medium text-ink">
+                  {{ displayName() }}
+                </span>
+                <span class="block truncate text-[11px] text-slate-400">
+                  {{ email() }}
+                </span>
               </span>
-            </span>
-            <button
-              type="button"
-              class="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-white/10 hover:text-white"
-              title="Sign out"
-              (click)="logout()"
+              <button
+                type="button"
+                class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-canvas hover:text-ink"
+                title="Sign out"
+                aria-label="Sign out"
+                (click)="logout()"
+              >
+                <msa-icon name="logout" [size]="16" />
+              </button>
+            </div>
+            <a
+              routerLink="/settings"
+              routerLinkActive="text-brand"
+              class="mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] font-medium text-slate-500 transition-colors hover:bg-canvas hover:text-ink"
+              (click)="closeMobile()"
             >
-              <msa-icon name="logout" [size]="16" />
-            </button>
+              <msa-icon name="gear" [size]="15" />
+              Settings
+              <msa-icon name="arrow-right" [size]="12" class="ml-auto" />
+            </a>
           </div>
         </div>
       </aside>
@@ -134,6 +141,7 @@ interface SoonItem {
             type="button"
             class="msa-icon-btn"
             title="Open navigation"
+            aria-label="Open navigation"
             (click)="mobileOpen.set(true)"
           >
             <msa-icon name="menu" [size]="18" />
@@ -146,11 +154,13 @@ interface SoonItem {
             </span>
             ModelScope AI
           </span>
-          <span
+          <a
+            routerLink="/settings"
             class="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand to-violet text-[11px] font-semibold text-white"
+            [attr.aria-label]="'Account settings for ' + displayName()"
           >
             {{ initials() }}
-          </span>
+          </a>
         </header>
 
         <main class="flex-1">
@@ -165,7 +175,7 @@ export class ShellComponent {
 
   readonly mobileOpen = signal(false);
 
-  readonly navItems: NavItem[] = [
+  readonly primaryNav: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'grid' },
     { label: 'Workspaces', path: '/workspaces', icon: 'layers' },
     { label: 'Playground', path: '/playground', icon: 'play' },
@@ -177,10 +187,8 @@ export class ShellComponent {
     { label: 'Analytics', path: '/analytics', icon: 'chart' },
   ];
 
-  readonly soonItems: SoonItem[] = [
-    { label: 'Projects', icon: 'folder' },
-    { label: 'Providers', icon: 'plug' },
-    { label: 'Settings', icon: 'gear' },
+  readonly secondaryNav: NavItem[] = [
+    { label: 'Settings', path: '/settings', icon: 'gear' },
   ];
 
   readonly displayName = computed(

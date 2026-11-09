@@ -233,3 +233,52 @@ def test_non_member_cannot_list_or_add_members(
         ).status_code
         == 404
     )
+
+
+def test_owner_exports_workspace_without_credentials(
+    owner_client, user, workspace, fernet_key_env
+):
+    from apps.projects.models import Project
+    from apps.providers.models import ProviderConfig, ProviderSecret
+
+    project = Project.objects.create(
+        workspace=workspace, name="Export project", created_by=user
+    )
+    provider = ProviderConfig.objects.create(
+        project=project,
+        name="Cloud provider",
+        kind=ProviderConfig.Kind.ZAI,
+        endpoint="https://api.z.ai/api/paas/v4",
+    )
+    ProviderSecret.objects.create(
+        provider=provider, encrypted_value=b"encrypted-secret-value"
+    )
+
+    response = owner_client.get(f"/api/v1/workspaces/{workspace.id}/export/")
+    assert response.status_code == 200
+    assert response["Content-Disposition"].startswith("attachment;")
+    body = response.json()
+    assert body["format"] == "modelscope-ai-workspace-export"
+    assert body["workspace"]["name"] == "Acme"
+    assert body["projects"][0]["name"] == "Export project"
+    serialized = response.content.decode()
+    assert "encrypted-secret-value" not in serialized
+    assert "api_key" not in serialized
+    assert AuditEvent.objects.filter(
+        action="workspace.exported", target_id=workspace.id
+    ).exists()
+
+
+def test_member_cannot_export_workspace(
+    authenticated_client, user, other_user, workspace
+):
+    add_member(
+        actor=user,
+        workspace_id=workspace.id,
+        email=other_user.email,
+        role=Membership.Role.MEMBER,
+    )
+    response = authenticated_client(other_user).get(
+        f"/api/v1/workspaces/{workspace.id}/export/"
+    )
+    assert response.status_code == 403

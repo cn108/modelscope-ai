@@ -7,9 +7,9 @@ human review.  Only redacted evidence leaves this module.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import ipaddress
 import re
+from dataclasses import dataclass
 
 from .base import (
     SEVERITY_HIGH,

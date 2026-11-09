@@ -10,6 +10,7 @@ import {
   persistSession,
   persistUser,
   readAccessToken,
+  readRefreshToken,
   readStoredUser,
 } from './session';
 
@@ -52,7 +53,50 @@ export class AuthService {
     );
   }
 
+  updateProfile(input: {
+    display_name?: string;
+    preferences?: Record<string, unknown>;
+  }): Observable<User> {
+    return this.http.patch<User>(`${this.base}/me/`, input).pipe(
+      tap((user) => {
+        this.user.set(user);
+        persistUser(user);
+      }),
+    );
+  }
+
+  changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Observable<{ detail: string; refresh_tokens_revoked: number }> {
+    return this.http.post<{ detail: string; refresh_tokens_revoked: number }>(
+      `${this.base}/change-password/`,
+      {
+        current_password: currentPassword,
+        new_password: newPassword,
+      },
+    );
+  }
+
+  landingRoute(): string {
+    const page = this.user()?.preferences?.landing_page;
+    return page === 'workspaces' || page === 'playground'
+      ? `/${page}`
+      : '/dashboard';
+  }
+
   logout(): void {
+    const refresh = readRefreshToken();
+    const access = this.accessToken();
+    if (refresh && access) {
+      this.http
+        .post(
+          `${this.base}/logout/`,
+          { refresh },
+          { headers: { Authorization: `Bearer ${access}` } },
+        )
+        .subscribe({ error: () => undefined });
+    }
     clearSession();
     this.user.set(null);
     this.accessToken.set(null);

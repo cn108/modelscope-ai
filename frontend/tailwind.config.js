@@ -4,10 +4,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        canvas: '#f4f6fb',
-        ink: '#0f172a',
-        muted: '#64748b',
-        line: '#e6eaf2',
+        canvas: '#f9fafb',
+        ink: '#111827',
+        muted: '#6b7280',
+        line: '#e5e7eb',
         brand: {
           DEFAULT: '#2563eb',
           dark: '#1d4ed8',

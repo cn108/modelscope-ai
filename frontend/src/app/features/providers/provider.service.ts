@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
-export type ProviderKind = 'zai' | 'ollama';
+export type ProviderKind = 'zai' | 'ollama' | 'lmstudio';
 
 export interface ProviderConfig {
   id: string;
@@ -50,6 +50,16 @@ export class ProviderService {
 
   create(projectId: string, input: ProviderInput): Observable<ProviderConfig> {
     return this.http.post<ProviderConfig>(`${this.base}/projects/${projectId}/providers/`, input);
+  }
+
+  update(
+    providerId: string,
+    input: Partial<ProviderInput>,
+  ): Observable<ProviderConfig> {
+    return this.http.patch<ProviderConfig>(
+      `${this.base}/providers/${providerId}/`,
+      input,
+    );
   }
 
   test(providerId: string): Observable<{ ok: boolean; status: string; detail: string }> {

@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 curl gcc libpq-dev \
+    libpq5 curl postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements/base.txt requirements/base.txt
@@ -15,8 +15,11 @@ RUN pip install -r requirements/base.txt
 
 COPY . .
 
-# Non-root runtime user
-RUN useradd --create-home appuser && chown -R appuser:appuser /app
+# Non-root runtime user. Create mount points first so named volumes inherit
+# appuser ownership and collectstatic/backups can write without running as root.
+RUN useradd --create-home appuser \
+    && mkdir -p /app/staticfiles /backups \
+    && chown -R appuser:appuser /app /backups
 USER appuser
 
 EXPOSE 8000

@@ -21,6 +21,37 @@ ZAI_MODELS = (
 )
 
 
+def validate_lmstudio_endpoint(endpoint: str) -> str:
+    """Allow only a local LM Studio OpenAI-compatible endpoint.
+
+    LM Studio defaults to port 1234 and serves the OpenAI API under ``/v1``.
+    Cloud/external hosts are rejected for the same SSRF reason as Ollama.
+    """
+    parts = urlsplit(endpoint)
+    if parts.scheme not in {"http", "https"} or not parts.hostname:
+        raise ValueError("LM Studio endpoint must be an absolute HTTP(S) URL.")
+    if parts.username or parts.password or parts.query or parts.fragment:
+        raise ValueError("LM Studio endpoint cannot include credentials, query, or fragment.")
+    host = parts.hostname.lower().rstrip(".")
+    if host not in {"localhost", "host.docker.internal"}:
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError as exc:
+            raise ValueError(
+                "LM Studio endpoint host must be localhost, host.docker.internal, or a loopback IP address."
+            ) from exc
+        if not address.is_loopback:
+            raise ValueError(
+                "LM Studio endpoint must use localhost, host.docker.internal, or a loopback IP address."
+            )
+    if parts.port not in (None, 1234):
+        raise ValueError("LM Studio endpoint must use the standard local port 1234.")
+    path = parts.path.rstrip("/")
+    if path not in {"", "/v1"}:
+        raise ValueError("LM Studio endpoint base path must be /v1 or the root.")
+    return f"{parts.scheme}://{parts.netloc}/v1"
+
+
 def validate_ollama_endpoint(endpoint: str) -> str:
     parts = urlsplit(endpoint)
     if parts.scheme not in {"http", "https"} or not parts.hostname:
@@ -104,6 +135,81 @@ class ZaiAdapter(ProviderAdapter):
                 category, message = "invalid_response", "Z.ai returned an unexpected response."
             return GenerationResult(
                 provider="zai",
+                model_id=request.model_id,
+                content=None,
+                latency_ms=(time.monotonic() - started) * 1000,
+                error={"category": category, "message": message},
+            )
+
+
+class LmStudioAdapter(ProviderAdapter):
+    """Local LM Studio's OpenAI-compatible chat completions API."""
+
+    def __init__(self, endpoint: str, api_key: str | None = None):
+        self.base_url = validate_lmstudio_endpoint(endpoint)
+        self.api_key = api_key
+
+    def capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(supports_model_listing=True)
+
+    def list_models(self) -> list[ModelInfo]:
+        response = request_json(
+            url=f"{self.base_url}/models", api_key=self.api_key
+        )
+        data = response.get("data", [])
+        if not isinstance(data, list):
+            raise ProviderRequestError(
+                "invalid_response", "LM Studio returned an unexpected model list."
+            )
+        return [
+            ModelInfo("lmstudio", item["id"], item.get("id"))
+            for item in data
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        ]
+
+    def validate_connection(self) -> ConnectionStatus:
+        try:
+            self.list_models()
+        except ProviderRequestError as exc:
+            return ConnectionStatus(False, str(exc))
+        return ConnectionStatus(True, "Local LM Studio endpoint is reachable.")
+
+    def generate(self, request: GenerationRequest) -> GenerationResult:
+        started = time.monotonic()
+        try:
+            response = request_json(
+                url=f"{self.base_url}/chat/completions",
+                method="POST",
+                api_key=self.api_key,
+                payload={
+                    "model": request.model_id,
+                    "messages": request.messages,
+                    **request.parameters,
+                },
+            )
+            choice = response["choices"][0]
+            usage = response.get("usage") or {}
+            return GenerationResult(
+                provider="lmstudio",
+                model_id=request.model_id,
+                content=(choice.get("message") or {}).get("content"),
+                input_tokens=usage.get("prompt_tokens"),
+                output_tokens=usage.get("completion_tokens"),
+                tokens_are_provider_reported=bool(usage),
+                latency_ms=(time.monotonic() - started) * 1000,
+                finish_reason=choice.get("finish_reason"),
+                request_id=response.get("id"),
+            )
+        except (ProviderRequestError, KeyError, IndexError, TypeError) as exc:
+            if isinstance(exc, ProviderRequestError):
+                category, message = exc.category, str(exc)
+            else:
+                category, message = (
+                    "invalid_response",
+                    "LM Studio returned an unexpected response.",
+                )
+            return GenerationResult(
+                provider="lmstudio",
                 model_id=request.model_id,
                 content=None,
                 latency_ms=(time.monotonic() - started) * 1000,

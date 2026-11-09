@@ -22,6 +22,7 @@ export interface MetricResult {
   score: number | null;
   passed: boolean | null;
   threshold: number | null;
+  metric_version?: string;
   reason: string;
   error: string | null;
 }
@@ -88,12 +89,31 @@ export interface Evaluation {
     judge?: { provider_name: string; model_id: string } | null;
     judge_calls?: number;
   };
+  review_summary: EvaluationReviewSummary;
   error: EvaluationError | null;
   created_by: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
   models: EvaluationModel[];
+}
+
+export interface EvaluationReview {
+  id: string;
+  reviewer: string | null;
+  reviewer_email: string;
+  label: 'pass' | 'fail' | 'unsure';
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvaluationReviewSummary {
+  total_reviews: number;
+  reviewed_results: number;
+  labels: Record<string, number>;
+  disagreements: number;
+  agreement_rate: number | null;
 }
 
 export interface EvaluationResultRow {
@@ -113,6 +133,7 @@ export interface EvaluationResultRow {
   status: 'pending' | 'succeeded' | 'failed';
   scores: Record<string, number>;
   metric_results: MetricResult[];
+  reviews: EvaluationReview[];
   error: EvaluationError | null;
   created_at: string;
   updated_at: string;
@@ -182,6 +203,18 @@ export class EvaluationService {
     return this.http.post<Evaluation>(
       `${this.base}/evaluations/${evaluationId}/rerun/`,
       {},
+    );
+  }
+
+  saveReview(
+    evaluationId: string,
+    resultId: string,
+    label: EvaluationReview['label'],
+    note: string,
+  ): Observable<EvaluationReview> {
+    return this.http.post<EvaluationReview>(
+      `${this.base}/evaluations/${evaluationId}/results/${resultId}/reviews/`,
+      { label, note },
     );
   }
 }

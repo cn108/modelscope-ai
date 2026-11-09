@@ -3,6 +3,10 @@ __pycache__/
 node_modules/
 .vscode/
 
+# Local database dumps
+backups/
+backend/backups/
+
 # Local environment files and secrets — never commit these.
 .env
 .env.*

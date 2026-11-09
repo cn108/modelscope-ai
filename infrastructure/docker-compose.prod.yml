@@ -1,0 +1,153 @@
+# ModelScope AI — production-oriented Compose profile.
+#
+# This profile does not publish PostgreSQL or Redis, runs Django with
+# config.settings.prod, collects static files, and schedules database backups.
+# TLS is expected to terminate at a reverse proxy / load balancer in front of the
+# frontend service. Set SECURE_SSL_REDIRECT=true and the forwarded-proto header
+# when TLS is active.
+#
+#   cp .env.example .env
+#   # set DJANGO_SECRET_KEY, POSTGRES_PASSWORD, PROVIDER_SECRET_KEYS,
+#   # DJANGO_ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS, CSRF_TRUSTED_ORIGINS
+#   docker compose -f infrastructure/docker-compose.prod.yml --env-file .env up --build -d
+name: modelscope-ai-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-modelscope}
+      POSTGRES_USER: ${POSTGRES_USER:-modelscope}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-modelscope} -d ${POSTGRES_DB:-modelscope}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  backend:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      BACKUP_ENABLED: "true"
+      BACKUP_DIR: /backups
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000
+             --workers ${GUNICORN_WORKERS:-4} --timeout 120
+             --access-logfile - --error-logfile -"
+    volumes:
+      - static_data:/app/staticfiles
+      - backup_data:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health/"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 45s
+    networks: [internal, edge]
+
+  worker:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      BACKUP_ENABLED: "true"
+      BACKUP_DIR: /backups
+    command: celery -A config worker --loglevel=INFO --concurrency=${CELERY_CONCURRENCY:-4}
+    volumes:
+      - backup_data:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [internal, edge]
+
+  beat:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      BACKUP_ENABLED: "true"
+      BACKUP_DIR: /backups
+    command: celery -A config beat --loglevel=INFO
+    volumes:
+      - backup_data:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [internal]
+
+  frontend:
+    build:
+      context: ../frontend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - static_data:/var/www/static:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+    networks: [edge]
+
+networks:
+  edge:
+  internal:
+    internal: true
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+  static_data:
+  backup_data:

@@ -1,7 +1,11 @@
 from rest_framework import serializers
 
 from apps.providers.models import ModelConfig, ProviderConfig
-from integrations.providers.adapters import ZAI_BASE_URL, validate_ollama_endpoint
+from integrations.providers.adapters import (
+    ZAI_BASE_URL,
+    validate_lmstudio_endpoint,
+    validate_ollama_endpoint,
+)
 
 ALLOWED_DEFAULTS = {
     "temperature",
@@ -80,6 +84,13 @@ class ProviderConfigSerializer(serializers.ModelSerializer):
         elif kind == ProviderConfig.Kind.OLLAMA:
             try:
                 attrs["endpoint"] = validate_ollama_endpoint(endpoint or "http://localhost:11434/api")
+            except ValueError as exc:
+                raise serializers.ValidationError({"endpoint": str(exc)}) from exc
+        elif kind == ProviderConfig.Kind.LMSTUDIO:
+            try:
+                attrs["endpoint"] = validate_lmstudio_endpoint(
+                    endpoint or "http://localhost:1234/v1"
+                )
             except ValueError as exc:
                 raise serializers.ValidationError({"endpoint": str(exc)}) from exc
         return attrs

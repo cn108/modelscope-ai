@@ -6,13 +6,36 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
-from apps.playground.views import ExecutionViewSet
+from apps.analytics.views import (
+    AnalyticsReportDetailView,
+    AnalyticsReportExportView,
+    ProjectAnalyticsReportView,
+    ProjectAnalyticsView,
+    ProjectModelPerformanceView,
+)
 from apps.datasets.views import DatasetRecordViewSet, DatasetViewSet
-from apps.evaluations.views import EvaluationMetricCatalogView, EvaluationViewSet
+from apps.evaluations.views import (
+    EvaluationMetricCatalogView,
+    EvaluationResultReviewView,
+    EvaluationViewSet,
+)
 from apps.observability.views import (
     ProjectObservabilityView,
     ProjectTraceListView,
     TraceDetailView,
+)
+from apps.playground.views import ExecutionViewSet
+from apps.projects.views import ProjectViewSet
+from apps.prompts.views import PromptViewSet
+from apps.providers.views import ProviderViewSet
+from apps.security.testing_views import (
+    ProjectSecurityTestCompareView,
+    ProjectSecurityTestHistoryView,
+    ProjectSecurityTestingDashboardView,
+    ProjectSecurityTestRunView,
+    SecurityTestCatalogView,
+    SecurityTestResultViewSet,
+    SecurityTestRunViewSet,
 )
 from apps.security.views import (
     ProjectSecurityCompareView,
@@ -23,27 +46,8 @@ from apps.security.views import (
     SecurityFindingViewSet,
     SecurityScanViewSet,
 )
-from apps.security.testing_views import (
-    ProjectSecurityTestCompareView,
-    ProjectSecurityTestingDashboardView,
-    ProjectSecurityTestHistoryView,
-    ProjectSecurityTestRunView,
-    SecurityTestCatalogView,
-    SecurityTestResultViewSet,
-    SecurityTestRunViewSet,
-)
-from apps.analytics.views import (
-    AnalyticsReportDetailView,
-    AnalyticsReportExportView,
-    ProjectAnalyticsReportView,
-    ProjectAnalyticsView,
-    ProjectModelPerformanceView,
-)
-from apps.projects.views import ProjectViewSet
-from apps.prompts.views import PromptViewSet
-from apps.providers.views import ProviderViewSet
 from apps.workspaces.views import WorkspaceViewSet
-from common.health.views import HealthView, WorkerHealthView
+from common.health.views import AboutView, HealthView, WorkerHealthView
 
 router = DefaultRouter()
 router.register("workspaces", WorkspaceViewSet, basename="workspace")
@@ -79,10 +83,16 @@ def api_not_found(request, exception=None):
 api_v1_patterns = [
     path("health/", HealthView.as_view(), name="health"),
     path("health/worker/", WorkerHealthView.as_view(), name="health-worker"),
+    path("about/", AboutView.as_view(), name="about"),
     path(
         "evaluation-metrics/",
         EvaluationMetricCatalogView.as_view(),
         name="evaluation-metrics",
+    ),
+    path(
+        "evaluations/<uuid:evaluation_id>/results/<uuid:result_id>/reviews/",
+        EvaluationResultReviewView.as_view(),
+        name="evaluation-result-reviews",
     ),
     path(
         "projects/<uuid:project_id>/analytics/",

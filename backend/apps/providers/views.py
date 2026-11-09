@@ -14,6 +14,7 @@ from apps.providers.services import (
     update_provider,
 )
 from apps.workspaces.permissions import UUID_RE
+from common.throttling import ModelCallRateThrottle
 
 
 class ProviderViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
@@ -47,6 +48,11 @@ class ProviderViewSet(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins
     def destroy(self, request, *args, **kwargs):
         delete_provider(actor=request.user, provider_id=kwargs["pk"])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_throttles(self):
+        if self.action in {"test_connection", "models"}:
+            return [ModelCallRateThrottle()]
+        return super().get_throttles()
 
     @action(detail=True, methods=["post"], url_path="test")
     def test_connection(self, request, pk=None):

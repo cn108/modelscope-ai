@@ -74,7 +74,7 @@ export interface SecurityScan {
   scanned_items: number;
   finding_count: number;
   highest_severity: SecuritySeverity | '';
-  summary: SecurityScanSummary;
+  summary: Partial<SecurityScanSummary>;
   error: { category: string; message: string } | null;
   created_by: string | null;
   created_by_email: string;

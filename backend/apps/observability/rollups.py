@@ -9,9 +9,10 @@ survive while the raw table stays bounded.
 
 from __future__ import annotations
 
-from datetime import date, datetime, time as dt_time, timedelta
-from decimal import Decimal
 import logging
+from datetime import date, datetime, timedelta
+from datetime import time as dt_time
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction

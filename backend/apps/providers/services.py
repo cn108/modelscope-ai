@@ -14,7 +14,7 @@ from common.audit.services import record_event
 from common.encryption import decrypt_secret, encrypt_secret
 from common.encryption.service import SecretCryptoError
 from common.exceptions import ServiceUnavailable
-from integrations.providers.adapters import OllamaAdapter, ZaiAdapter
+from integrations.providers.adapters import LmStudioAdapter, OllamaAdapter, ZaiAdapter
 from integrations.providers.http import ProviderRequestError
 from integrations.telemetry.tracing import model_call_span
 
@@ -132,6 +132,17 @@ def adapter_for(provider):
         return ZaiAdapter(api_key)
     if provider.kind == ProviderConfig.Kind.OLLAMA:
         return OllamaAdapter(provider.endpoint)
+    if provider.kind == ProviderConfig.Kind.LMSTUDIO:
+        lmstudio_key: str | None = None
+        secret = getattr(provider, "secret", None)
+        if secret is not None:
+            try:
+                lmstudio_key = decrypt_secret(secret.encrypted_value)
+            except SecretCryptoError as exc:
+                raise ServiceUnavailable(
+                    "The stored provider credential cannot be decrypted with the configured keys."
+                ) from exc
+        return LmStudioAdapter(provider.endpoint, lmstudio_key)
     raise ValidationError({"kind": "Unsupported provider type."})
 
 

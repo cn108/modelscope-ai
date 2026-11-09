@@ -12,8 +12,8 @@ Key generation:  python -m cryptography.fernet  (or `Fernet.generate_key()`).
 Rotation runbook: docs/adr/ADR-0003-secret-encryption.md
 """
 
-from django.conf import settings
 from cryptography.fernet import Fernet, InvalidToken
+from django.conf import settings
 
 
 class SecretCryptoError(RuntimeError):

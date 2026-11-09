@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
@@ -15,7 +15,6 @@ import {
   ObservabilityService,
   TraceSummary,
   TrendPoint,
-  UsageRow,
 } from './observability.service';
 
 interface ProjectOption extends Project {
@@ -25,7 +24,7 @@ interface ProjectOption extends Project {
 @Component({
   selector: 'msa-observability',
   standalone: true,
-  imports: [DatePipe, RouterLink, IconComponent],
+  imports: [LocalDatePipe, RouterLink, IconComponent],
   template: `
     <div class="msa-page">
       <header class="flex flex-wrap items-end justify-between gap-4">
@@ -457,7 +456,7 @@ interface ProjectOption extends Project {
                           {{ trace.model_id }} · {{ trace.request_preview }}
                         </span>
                         <span class="block text-[11px] text-slate-400">
-                          {{ trace.source_label }} · {{ trace.started_at | date: 'medium' }}
+                          {{ trace.source_label }} · {{ trace.started_at | msaDate: 'medium' }}
                         </span>
                       </span>
                       <span class="text-xs font-medium text-slate-600">
@@ -505,7 +504,7 @@ interface ProjectOption extends Project {
                       </span>
                       <span class="block truncate text-[11px] text-slate-400">
                         {{ trace.provider_name }} · {{ trace.model_id }} ·
-                        {{ trace.source_label }} · {{ trace.started_at | date: 'medium' }}
+                        {{ trace.source_label }} · {{ trace.started_at | msaDate: 'medium' }}
                       </span>
                     </span>
                     <span class="msa-badge bg-slate-50 capitalize text-slate-500">

@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
@@ -35,7 +35,7 @@ interface TargetOption {
 @Component({
   selector: 'msa-security',
   standalone: true,
-  imports: [DatePipe, RouterLink, IconComponent, SecurityFindingDetailComponent],
+  imports: [LocalDatePipe, RouterLink, IconComponent, SecurityFindingDetailComponent],
   template: `
     <div class="msa-page">
       <header class="flex flex-wrap items-end justify-between gap-4">
@@ -425,7 +425,7 @@ interface TargetOption {
                       <td class="px-5 py-3">
                         <p class="text-sm font-medium text-ink">{{ scan.target_label }}</p>
                         <p class="text-[11px] text-slate-400">
-                          {{ scan.target_type }} · {{ scan.checks.join(', ') }} · {{ scan.created_at | date: 'medium' }}
+                          {{ scan.target_type }} · {{ scan.checks.join(', ') }} · {{ scan.created_at | msaDate: 'medium' }}
                         </p>
                       </td>
                       <td class="px-3 py-3">
@@ -444,7 +444,7 @@ interface TargetOption {
                         <span class="text-sm font-semibold text-ink">{{ scan.finding_count }}</span>
                       </td>
                       <td class="px-3 py-3 text-[11px] text-slate-500">
-                        {{ (scan.started_at || scan.created_at) | date: 'short' }}
+                        {{ (scan.started_at || scan.created_at) | msaDate: 'short' }}
                       </td>
                       <td class="px-5 py-3 text-right">
                         <button
@@ -495,7 +495,7 @@ interface TargetOption {
                 >
                   @for (scan of scans(); track scan.id) {
                     <option [value]="scan.id">
-                      {{ scan.target_label }} · {{ scan.created_at | date: 'short' }}
+                      {{ scan.target_label }} · {{ scan.created_at | msaDate: 'short' }}
                     </option>
                   }
                 </select>
@@ -514,7 +514,7 @@ interface TargetOption {
                   }
                   @for (scan of compareBaselineOptions(); track scan.id) {
                     <option [value]="scan.id">
-                      {{ scan.target_label }} · {{ scan.created_at | date: 'short' }}
+                      {{ scan.target_label }} · {{ scan.created_at | msaDate: 'short' }}
                     </option>
                   }
                 </select>
@@ -546,7 +546,7 @@ interface TargetOption {
                   <div>
                     <p class="text-sm font-semibold text-ink">{{ cmp.target.label }}</p>
                     <p class="text-[11px] text-slate-400">
-                      Baseline {{ cmp.baseline.created_at | date: 'medium' }} → current {{ cmp.current.created_at | date: 'medium' }}
+                      Baseline {{ cmp.baseline.created_at | msaDate: 'medium' }} → current {{ cmp.current.created_at | msaDate: 'medium' }}
                       @if (cmp.target.version_changed) {
                         · version {{ cmp.target.baseline_version || 'unknown' }} → {{ cmp.target.current_version || 'unknown' }}
                       }
@@ -663,7 +663,7 @@ interface TargetOption {
                 <h2 class="msa-section-title">Scan summary · {{ scan.target_label }}</h2>
                 <p class="text-xs text-muted">
                   {{ scan.checks.join(', ') }} · {{ scan.status }} ·
-                  {{ scan.created_at | date: 'medium' }}
+                  {{ scan.created_at | msaDate: 'medium' }}
                 </p>
               </div>
               <button type="button" class="msa-btn-ghost" (click)="clearScan()">
@@ -686,13 +686,13 @@ interface TargetOption {
                 </div>
                 <div class="rounded-lg border border-line p-3">
                   <p class="text-[10px] uppercase tracking-wide text-slate-400">Blocking labels</p>
-                  <p class="mt-1 text-sm font-semibold text-ink">{{ scan.summary.disposition_counts['blocking'] || 0 }}</p>
+                  <p class="mt-1 text-sm font-semibold text-ink">{{ scan.summary.disposition_counts?.['blocking'] || 0 }}</p>
                 </div>
               </div>
               <div>
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Detection limitations</p>
                 <ul class="mt-1.5 space-y-1 text-[11px] leading-relaxed text-slate-500">
-                  @for (limitation of scan.summary.limitations; track limitation) {
+                  @for (limitation of scan.summary.limitations ?? []; track limitation) {
                     <li class="flex items-start gap-1.5">
                       <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300"></span>
                       <span>{{ limitation }}</span>
@@ -786,7 +786,7 @@ interface TargetOption {
                         <span class="msa-badge" [class]="reviewStatusClass(finding.status)">{{ finding.status }}</span>
                       </td>
                       <td class="px-5 py-3 text-right text-[11px] text-slate-500">
-                        {{ finding.detected_at | date: 'short' }}
+                        {{ finding.detected_at | msaDate: 'short' }}
                       </td>
                     </tr>
                   }

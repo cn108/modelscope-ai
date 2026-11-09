@@ -2,7 +2,6 @@ from rest_framework import serializers
 
 from apps.datasets.models import Dataset, DatasetRecord
 
-
 MAX_TEXT_LENGTH = 20_000
 
 

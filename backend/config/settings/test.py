@@ -5,7 +5,7 @@ Integration verification against real PostgreSQL/Redis runs in Docker Compose
 """
 
 from .base import *  # noqa: F401,F403
-from .base import DATABASES, CACHES
+from .base import CACHES, DATABASES
 
 SECRET_KEY = "test-only-key-not-a-real-secret-0123456789abcdef"
 DEBUG = False

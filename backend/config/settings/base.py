@@ -48,6 +48,14 @@ TIME_ZONE = "UTC"
 
 LANGUAGE_CODE = "en-us"
 
+# Safe, public product metadata for the Settings → About panel.
+APP_VERSION = env("APP_VERSION", "1.0.0")
+ENVIRONMENT = env(
+    "DJANGO_ENVIRONMENT", "development" if env_bool("DJANGO_DEBUG", True) else "production"
+)
+SUPPORT_URL = env("SUPPORT_URL", "")
+DOCUMENTATION_URL = env("DOCUMENTATION_URL", "")
+
 # --- Apps ---------------------------------------------------------------
 # Milestone 1 ships the foundation only; feature apps under apps/ are added
 # starting Milestone 2 (identity/tenancy) per the roadmap in §13.
@@ -88,6 +96,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "common.middleware.ContentSecurityPolicyMiddleware",
 ]
 
 TEMPLATES = [
@@ -175,6 +184,11 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "common.exceptions.api_exception_handler",
+    "DEFAULT_THROTTLE_RATES": {
+        "login": env("RATE_LIMIT_LOGIN", "10/min"),
+        "model_call": env("RATE_LIMIT_MODEL_CALL", "30/min"),
+        "evaluation_create": env("RATE_LIMIT_EVALUATION_CREATE", "30/hour"),
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -190,11 +204,25 @@ CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS", "http://localhost:4200,http://localhost:8080"
 )
 CORS_ALLOW_CREDENTIALS = False
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS", "http://localhost:4200,http://localhost:8080"
+)
 
 # --- Provider secret encryption (§11) --------------------------------------
 # Key lives outside DB and source control; rotate by adding a new key and
 # re-encrypting (see docs/adr/ADR-0003-secret-encryption.md).
 PROVIDER_SECRET_KEYS = env_list("PROVIDER_SECRET_KEYS")  # Fernet keys, current first
+
+# Provider transport hardening: a single call is bounded, transient failures
+# are retried with exponential backoff, and each worker process caps in-flight
+# provider calls. Concurrency is per process; scale workers for more throughput.
+PROVIDER_TIMEOUT_SECONDS = float(env("PROVIDER_TIMEOUT_SECONDS", "60") or 60)
+PROVIDER_MAX_RETRIES = int(env("PROVIDER_MAX_RETRIES", "2") or 0)
+PROVIDER_RETRY_BACKOFF_SECONDS = float(env("PROVIDER_RETRY_BACKOFF_SECONDS", "0.25") or 0)
+PROVIDER_MAX_CONCURRENCY = int(env("PROVIDER_MAX_CONCURRENCY", "8") or 8)
+PROVIDER_CONCURRENCY_WAIT_SECONDS = float(
+    env("PROVIDER_CONCURRENCY_WAIT_SECONDS", "5") or 5
+)
 
 # --- Evaluation metrics -----------------------------------------------------
 # Judge-based metrics (DeepEval) need a configured provider/model to score and
@@ -231,15 +259,24 @@ SECURITY_MAX_SCAN_ITEMS = int(env("SECURITY_MAX_SCAN_ITEMS", "10000") or 10000)
 SECURITY_TEST_MAX_MODELS = int(env("SECURITY_TEST_MAX_MODELS", "5") or 5)
 SECURITY_TEST_MAX_RESULTS = int(env("SECURITY_TEST_MAX_RESULTS", "120") or 120)
 
-if OBSERVABILITY_ROLLUP_ENABLED:
+BACKUP_ENABLED = env_bool("BACKUP_ENABLED", False)
+BACKUP_DIR = env("BACKUP_DIR", "backups")
+BACKUP_RETENTION_DAYS = int(env("BACKUP_RETENTION_DAYS", "30") or 30)
+
+CELERY_BEAT_SCHEDULE = {}
+if OBSERVABILITY_ROLLUP_ENABLED or BACKUP_ENABLED:
     from celery.schedules import crontab
 
-    CELERY_BEAT_SCHEDULE = {
-        "observability-maintenance": {
+    if OBSERVABILITY_ROLLUP_ENABLED:
+        CELERY_BEAT_SCHEDULE["observability-maintenance"] = {
             "task": "apps.observability.maintain",
             "schedule": crontab(minute=15, hour=1),
         }
-    }
+    if BACKUP_ENABLED:
+        CELERY_BEAT_SCHEDULE["database-backup"] = {
+            "task": "common.backup_database",
+            "schedule": crontab(minute=30, hour=2),
+        }
 
 # --- Security hardening (§11) ----------------------------------------------
 SECURE_CONTENT_TYPE_NOSNIFF = True

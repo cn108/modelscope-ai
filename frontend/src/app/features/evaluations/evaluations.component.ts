@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import {
   Component,
   OnDestroy,
@@ -20,6 +20,7 @@ import {
   Evaluation,
   EvaluationModel,
   EvaluationResultRow,
+  EvaluationReview,
   EvaluationService,
   MetricDefinition,
 } from './evaluation.service';
@@ -39,7 +40,7 @@ const PAGE_SIZE = 50;
 @Component({
   selector: 'msa-evaluations',
   standalone: true,
-  imports: [DatePipe, IconComponent],
+  imports: [LocalDatePipe, IconComponent],
   template: `
     <div class="msa-page">
       <header class="flex flex-wrap items-end justify-between gap-4">
@@ -334,7 +335,7 @@ const PAGE_SIZE = 50;
                           </span>
                         </span>
                         <span class="mt-1 block text-[11px] text-slate-400">
-                          {{ run.created_at | date: 'medium' }} ·
+                          {{ run.created_at | msaDate: 'medium' }} ·
                           {{ run.models.length }} model{{ run.models.length === 1 ? '' : 's' }} ·
                           {{ run.completed_cases }}/{{ run.total_results }} case results
                         </span>
@@ -365,7 +366,7 @@ const PAGE_SIZE = 50;
                     </div>
                     <p class="mt-1 text-xs text-muted">
                       Dataset v{{ ev.dataset_version }} · created
-                      {{ ev.created_at | date: 'medium' }} ·
+                      {{ ev.created_at | msaDate: 'medium' }} ·
                       {{ ev.metrics.length }} metric{{ ev.metrics.length === 1 ? '' : 's' }}
                       @if (ev.judge) {
                         · judge {{ ev.judge.model_id }}
@@ -399,6 +400,15 @@ const PAGE_SIZE = 50;
                   @if (ev.failed_cases) {
                     <p class="mt-1 text-[11px] text-rose-600">
                       {{ ev.failed_cases }} case result{{ ev.failed_cases === 1 ? '' : 's' }} failed.
+                    </p>
+                  }
+                  @if (ev.review_summary.total_reviews) {
+                    <p class="mt-2 text-[11px] text-slate-500">
+                      {{ ev.review_summary.total_reviews }} human review(s) across
+                      {{ ev.review_summary.reviewed_results }} result(s)
+                      @if (ev.review_summary.disagreements) {
+                        · {{ ev.review_summary.disagreements }} disagreement(s)
+                      }
                     </p>
                   }
                 </div>
@@ -621,11 +631,61 @@ const PAGE_SIZE = 50;
                                       </td>
                                       <td class="max-w-[320px] text-[11px] text-slate-500">
                                         {{ metric.error || metric.reason || '—' }}
+                                        @if (metric.metric_version) {
+                                          <span class="ml-1 text-slate-400">v{{ metric.metric_version }}</span>
+                                        }
                                       </td>
                                     </tr>
                                   }
                                 </tbody>
                               </table>
+                            </div>
+
+                            <div class="rounded-lg bg-white p-3 ring-1 ring-line">
+                              <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                  Human review
+                                </p>
+                                @if (row.reviews.length) {
+                                  <span class="msa-badge bg-slate-50 text-slate-500">
+                                    {{ row.reviews.length }} review(s)
+                                  </span>
+                                }
+                              </div>
+                              @for (review of row.reviews; track review.id) {
+                                <p class="mt-2 rounded-lg bg-canvas px-2 py-1.5 text-[11px] text-slate-600">
+                                  <span class="font-medium text-ink">{{ review.reviewer_email || 'Former reviewer' }}</span>
+                                  marked <span class="font-medium">{{ review.label }}</span>
+                                  @if (review.note) { · {{ review.note }} }
+                                </p>
+                              }
+                              <div class="mt-3 grid gap-2 sm:grid-cols-[150px_1fr_auto]">
+                                <select
+                                  class="msa-input"
+                                  [value]="reviewLabel()"
+                                  (change)="reviewLabel.set($any($event.target).value)"
+                                  aria-label="Human review label"
+                                >
+                                  <option value="pass">Pass</option>
+                                  <option value="fail">Fail</option>
+                                  <option value="unsure">Unsure</option>
+                                </select>
+                                <input
+                                  class="msa-input"
+                                  placeholder="Optional review note"
+                                  [value]="reviewNote()"
+                                  (input)="reviewNote.set($any($event.target).value)"
+                                  aria-label="Human review note"
+                                />
+                                <button
+                                  type="button"
+                                  class="msa-btn-secondary"
+                                  [disabled]="reviewSaving()"
+                                  (click)="saveReview(row)"
+                                >
+                                  Save review
+                                </button>
+                              </div>
                             </div>
                           </div>
                         }
@@ -704,6 +764,9 @@ export class EvaluationsComponent implements OnInit, OnDestroy {
   readonly resultStatusFilter = signal('');
   readonly resultLoading = signal(false);
   readonly expandedResultId = signal<string | null>(null);
+  readonly reviewLabel = signal<EvaluationReview['label']>('pass');
+  readonly reviewNote = signal('');
+  readonly reviewSaving = signal(false);
 
   readonly loading = signal(true);
   readonly starting = signal(false);
@@ -896,6 +959,46 @@ export class EvaluationsComponent implements OnInit, OnDestroy {
 
   toggleResult(rowId: string): void {
     this.expandedResultId.update((current) => (current === rowId ? null : rowId));
+    this.reviewNote.set('');
+    this.reviewLabel.set('pass');
+  }
+
+  saveReview(row: EvaluationResultRow): void {
+    const evaluationId = this.selectedEvaluationId();
+    if (!evaluationId) {
+      return;
+    }
+    this.reviewSaving.set(true);
+    this.resetMessages();
+    this.evaluationService
+      .saveReview(evaluationId, row.id, this.reviewLabel(), this.reviewNote().trim())
+      .subscribe({
+        next: (review) => {
+          this.results.update((rows) =>
+            rows.map((item) =>
+              item.id === row.id
+                ? {
+                    ...item,
+                    reviews: [
+                      review,
+                      ...(item.reviews ?? []).filter(
+                        (existing) => existing.reviewer !== review.reviewer,
+                      ),
+                    ],
+                  }
+                : item,
+            ),
+          );
+          this.reviewSaving.set(false);
+          this.reviewNote.set('');
+          this.notice.set('Human review saved.');
+          this.loadEvaluation(evaluationId);
+        },
+        error: (error: unknown) => {
+          this.reviewSaving.set(false);
+          this.error.set(apiErrorMessage(error));
+        },
+      });
   }
 
   loadResults(page: number): void {

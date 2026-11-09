@@ -17,11 +17,12 @@ returned as missing, never as a made-up number or a zero cost.
 
 from __future__ import annotations
 
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime, time as dt_time, timedelta
+from datetime import date, datetime, timedelta
+from datetime import time as dt_time
 from decimal import Decimal
-import uuid
 
 from django.db.models import Count, Q, Subquery, Sum
 from django.db.models.functions import Coalesce, TruncDate
@@ -30,10 +31,12 @@ from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework.exceptions import ValidationError
 
 from apps.evaluations.models import Evaluation
-from apps.observability.models import Trace, TraceRollup
+from apps.observability.models import Trace
 from apps.observability.services import (
     TraceFilters,
     _window,
+)
+from apps.observability.services import (
     dashboard as observability_dashboard,
 )
 from apps.playground.models import Execution

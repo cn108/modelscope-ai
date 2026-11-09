@@ -7,9 +7,12 @@ Never report a component as healthy when it could not be verified; unavailable
 checks are reported explicitly (specification section 1 honesty rule).
 """
 
+from typing import Any
+
 import django.db
 from django.conf import settings
-from rest_framework.permissions import AllowAny
+from django.utils import timezone
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -52,6 +55,46 @@ class HealthView(APIView):
         )
 
 
+class AboutView(APIView):
+    """Public product/build metadata for the authenticated About panel.
+
+    Deliberately excludes secrets, database credentials and environment values
+    that are not already safe to show to any signed-in user.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        engine = settings.DATABASES["default"]["ENGINE"].rsplit(".", 1)[-1]
+        return Response(
+            {
+                "name": "ModelScope AI",
+                "version": settings.APP_VERSION,
+                "environment": settings.ENVIRONMENT,
+                "api_version": "v1",
+                "server_time": timezone.now(),
+                "database": engine,
+                "features": {
+                    "judge_metrics": bool(
+                        getattr(settings, "EVALUATION_JUDGE_METRICS_ENABLED", True)
+                    ),
+                    "otlp_export": bool(
+                        getattr(settings, "OTEL_EXPORTER_OTLP_ENDPOINT", "")
+                    ),
+                    "observability_retention_days": int(
+                        getattr(settings, "OBSERVABILITY_TRACE_RETENTION_DAYS", 0) or 0
+                    ),
+                },
+                "links": {
+                    "api_docs": "/api/docs/",
+                    "openapi": "/api/schema/",
+                    "documentation": settings.DOCUMENTATION_URL,
+                    "support": settings.SUPPORT_URL,
+                },
+            }
+        )
+
+
 class WorkerHealthView(APIView):
     """Broker connectivity, plus an optional live Celery round trip.
 
@@ -64,8 +107,10 @@ class WorkerHealthView(APIView):
 
     def get(self, request: Request) -> Response:
         broker = _check_redis()
-        payload = {"status": "ok" if broker["status"] == "ok" else "degraded",
-                   "broker": broker}
+        payload: dict[str, Any] = {
+            "status": "ok" if broker["status"] == "ok" else "degraded",
+            "broker": broker,
+        }
 
         if request.query_params.get("probe") == "1":
             payload["worker"] = self._celery_round_trip()

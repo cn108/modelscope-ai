@@ -9,6 +9,7 @@ class ProviderConfig(models.Model):
     class Kind(models.TextChoices):
         ZAI = "zai", "Z.ai"
         OLLAMA = "ollama", "Ollama"
+        LMSTUDIO = "lmstudio", "LM Studio"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(

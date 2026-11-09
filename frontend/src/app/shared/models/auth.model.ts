@@ -1,7 +1,15 @@
+export interface UserPreferences {
+  timezone: string;
+  date_format: 'medium' | 'short' | 'iso';
+  default_workspace: string | null;
+  landing_page: 'dashboard' | 'workspaces' | 'playground';
+}
+
 export interface User {
   id: string;
   email: string;
   display_name: string;
+  preferences?: Partial<UserPreferences>;
   created_at: string;
 }
 

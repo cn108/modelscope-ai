@@ -11,9 +11,10 @@ from rest_framework.views import APIView
 
 from apps.workspaces.permissions import UUID_RE
 from common.pagination import DefaultPagination
+from common.throttling import EvaluationCreateRateThrottle
 from integrations.security_testing import registry
 
-from .models import SecurityTestModel, SecurityTestResult, SecurityTestRun
+from .models import SecurityTestResult, SecurityTestRun
 from .testing_serializers import (
     SecurityTestResultDetailSerializer,
     SecurityTestResultListSerializer,
@@ -57,6 +58,7 @@ class ProjectSecurityTestingDashboardView(APIView):
 
 class ProjectSecurityTestRunView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [EvaluationCreateRateThrottle]
 
     def get(self, request, project_id):
         rows = list_runs(

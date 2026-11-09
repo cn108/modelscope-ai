@@ -48,7 +48,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # Local inference on the host (LM Studio/Ollama) must be reachable (§12)
+    # Local Ollama/LM Studio on the host must be reachable (§12). LM Studio uses
+    # the standard port 1234; see docs/PROVIDERS.md.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:

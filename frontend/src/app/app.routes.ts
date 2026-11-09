@@ -84,6 +84,13 @@ export const routes: Routes = [
             (m) => m.AnalyticsComponent,
           ),
       },
+      {
+        path: 'settings',
+        loadComponent: () =>
+          import('./features/settings/settings.component').then(
+            (m) => m.SettingsComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

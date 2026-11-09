@@ -3,6 +3,10 @@
 Date: 2026-11-09 · Baseline: specification v1.0 §13 (Milestone 2)
 Status: **complete against its exit criterion** (permission and cross-tenant tests pass)
 
+> Final-phase note (9 November 2026): the limitations at the bottom describe the state at
+> M2 exit. Later milestones added live PostgreSQL/Redis Compose runs, Karma specs, the
+> Playwright journey and CI gates; see [HANDOVER](../HANDOVER.md#verification-evidence).
+
 ## Delivered
 
 - Email/password authentication: `register`, `login`, `refresh` (rotation + blacklist) and `me`.
@@ -89,4 +93,5 @@ viewer restrictions, audit records and cascading workspace deletion.
 
 ## Next milestone
 
-Milestone 3 (provider layer: encrypted credentials, adapters, connection tests) has **not** been started.
+Milestone 3 (provider layer: encrypted credentials, adapters, connection tests) was completed
+in the following milestone; see [MILESTONE-3](MILESTONE-3.md).

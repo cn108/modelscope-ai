@@ -1,9 +1,9 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { catchError, forkJoin, map, of } from 'rxjs';
 
 import { apiErrorMessage } from '../../shared/api-error';
-import { Paginated, Project, Workspace } from '../../shared/models/workspace.model';
+import { Project } from '../../shared/models/workspace.model';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { ProjectService } from '../projects/project.service';
 import { WorkspaceService } from '../workspaces/workspace.service';
@@ -23,7 +23,7 @@ const PAGE_SIZE = 50;
 @Component({
   selector: 'msa-datasets',
   standalone: true,
-  imports: [DatePipe, IconComponent],
+  imports: [LocalDatePipe, IconComponent],
   template: `
     <div class="msa-page">
       <header class="flex flex-wrap items-end justify-between gap-4">
@@ -179,7 +179,7 @@ const PAGE_SIZE = 50;
                       {{ current.record_count }} record{{
                         current.record_count === 1 ? '' : 's'
                       }}
-                      · created {{ current.created_at | date: 'mediumDate' }}
+                      · created {{ current.created_at | msaDate: 'mediumDate' }}
                     </p>
                   </div>
                   <button

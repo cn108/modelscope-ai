@@ -7,8 +7,8 @@ detector cannot cover every wording, encoding or multi-turn strategy.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from .base import (
     SEVERITY_HIGH,

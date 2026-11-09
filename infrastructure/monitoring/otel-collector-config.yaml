@@ -1,0 +1,28 @@
+# Local OTLP/HTTP collector used to verify the backend and worker exporter.
+# Run with:
+#   docker run --rm --name modelscope-otel \
+#     -p 4318:4318 -p 4317:4317 \
+#     -v "$PWD/infrastructure/monitoring/otel-collector-config.yaml:/etc/otelcol/config.yaml" \
+#     otel/opentelemetry-collector-contrib:0.121.0 \
+#     --config /etc/otelcol/config.yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

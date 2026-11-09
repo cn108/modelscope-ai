@@ -39,6 +39,7 @@ class Evaluation(models.Model):
         max_length=16, choices=Status.choices, default=Status.QUEUED
     )
     metrics = models.JSONField(default=list, blank=True)
+    metric_versions = models.JSONField(default=dict, blank=True)
     metric_options = models.JSONField(default=dict, blank=True)
     parameters = models.JSONField(default=dict, blank=True)
     judge_provider = models.ForeignKey(
@@ -170,3 +171,46 @@ class EvaluationResult(models.Model):
 
     def __str__(self) -> str:
         return f"{self.model.model_id} #{self.record_position} ({self.status})"
+
+
+class EvaluationReview(models.Model):
+    """Human annotation for a sampled evaluation result.
+
+    Multiple reviewers can label the same result; disagreement is derived from
+    those labels rather than overwriting a single reviewer's judgement.
+    """
+
+    class Label(models.TextChoices):
+        PASS = "pass", "Pass"
+        FAIL = "fail", "Fail"
+        UNSURE = "unsure", "Unsure"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    result = models.ForeignKey(
+        EvaluationResult, on_delete=models.CASCADE, related_name="reviews"
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="evaluation_reviews",
+    )
+    label = models.CharField(max_length=16, choices=Label.choices)
+    note = models.CharField(max_length=2000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "evaluations_review"
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["result", "reviewer"],
+                name="uniq_evaluation_review_result_reviewer",
+            )
+        ]
+        indexes = [models.Index(fields=["result", "updated_at"])]
+
+    def __str__(self) -> str:
+        return f"{self.reviewer} on {self.result_id}: {self.label}"

@@ -9,12 +9,13 @@ rolled-up days from being counted twice.
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from dataclasses import dataclass
-from datetime import date, datetime, time as dt_time, timedelta
-from decimal import Decimal
 import logging
 import uuid
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from datetime import time as dt_time
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
@@ -108,11 +109,11 @@ def _parse_bound(value: str | None, *, end_of_day: bool) -> datetime | None:
     text = (value or "").strip()
     if not text:
         return None
-    parsed = parse_datetime(text)
-    if parsed is None:
-        day = parse_date(text)
-        if day is not None:
-            parsed = datetime.combine(day, dt_time.max if end_of_day else dt_time.min)
+    day = parse_date(text)
+    if day is not None:
+        parsed = datetime.combine(day, dt_time.max if end_of_day else dt_time.min)
+    else:
+        parsed = parse_datetime(text)
     if parsed is None:
         raise ValidationError({"detail": "Dates must be ISO dates or timestamps."})
     if timezone.is_naive(parsed):

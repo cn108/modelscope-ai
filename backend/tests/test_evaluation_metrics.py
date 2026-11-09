@@ -6,9 +6,13 @@ from integrations.evaluation import registry
 from integrations.evaluation.judge import JudgeError, ProviderJudge
 from integrations.evaluation.metrics import (
     contains_match,
+    context_precision,
+    context_recall,
     exact_match,
+    factual_correctness,
     normalize_text,
     token_f1,
+    toxicity,
 )
 from integrations.providers.base import GenerationResult
 
@@ -62,6 +66,49 @@ def test_normalisation_and_reference_metrics():
     assert token_f1("", "paris") == 0.0
 
 
+def test_additional_reference_metrics_and_versions():
+    assert factual_correctness("2 + 2 = 4", "4") > 0.5
+    assert factual_correctness("2 + 2 = 5", "4") < 0.5
+    assert context_precision(
+        "two plus two", "4", ["Two plus two equals four."]
+    ) > 0.0
+    assert context_recall("4", "4", ["The result is 4."]) == 1.0
+    assert context_recall("4", "5", ["The result is 4."]) == 0.0
+    assert toxicity("Thank you for your help.") == 1.0
+    assert toxicity("You are an idiot and I hate you") < 0.8
+    outcome = registry.evaluate(
+        registry.registry()["toxicity"],
+        case={"actual_output": "You are an idiot"},
+        judge=None,
+    )
+    assert outcome["metric_version"] == "1.0"
+    assert outcome["passed"] is False
+
+
+def test_custom_metric_hooks_are_registered_and_removed():
+    definition = registry.MetricDefinition(
+        key="custom_length",
+        label="Length ratio",
+        description="Test hook.",
+        source="custom",
+        version="2.1",
+        scorer=lambda prediction, reference, context: 0.75,
+    )
+    registry.register_metric(definition)
+    try:
+        assert registry.registry()["custom_length"].version == "2.1"
+        outcome = registry.evaluate(
+            definition,
+            case={"actual_output": "x", "expected_output": "y"},
+            judge=None,
+        )
+        assert outcome["score"] == 0.75
+        assert outcome["metric_version"] == "2.1"
+    finally:
+        registry.unregister_metric("custom_length")
+    assert "custom_length" not in registry.registry()
+
+
 def test_registry_catalog_and_resolution():
     keys = [item["key"] for item in registry.catalog()]
     assert keys[:3] == ["exact_match", "contains_match", "token_f1"]
@@ -89,6 +136,10 @@ def test_judge_metrics_are_hidden_when_unavailable(monkeypatch):
         "exact_match",
         "contains_match",
         "token_f1",
+        "factual_correctness",
+        "context_precision",
+        "context_recall",
+        "toxicity",
     ]
     with pytest.raises(Exception):
         registry.resolve_metrics(["answer_relevancy"])

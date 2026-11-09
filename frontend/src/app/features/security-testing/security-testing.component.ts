@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { catchError, forkJoin, map, of } from 'rxjs';
 
@@ -36,7 +36,7 @@ const SEVERITY_ORDER: SecurityTestSeverity[] = ['critical', 'high', 'medium', 'l
 @Component({
   selector: 'msa-security-testing',
   standalone: true,
-  imports: [DatePipe, IconComponent],
+  imports: [LocalDatePipe, IconComponent],
   template: `
     <div class="msa-page">
       <header class="flex flex-wrap items-end justify-between gap-4">
@@ -501,7 +501,7 @@ const SEVERITY_ORDER: SecurityTestSeverity[] = ['critical', 'high', 'medium', 'l
                             <span class="font-semibold text-rose-600">{{ run.summary.totals?.failed ?? 0 }}</span>
                           </td>
                           <td class="px-3 py-3 text-[11px] text-slate-500">
-                            {{ (run.started_at || run.created_at) | date: 'short' }}
+                            {{ (run.started_at || run.created_at) | msaDate: 'short' }}
                           </td>
                           <td class="px-5 py-3 text-right">
                             <button type="button" class="msa-btn-ghost" title="Rerun this configuration" (click)="$event.stopPropagation(); rerun(run)">
@@ -535,7 +535,7 @@ const SEVERITY_ORDER: SecurityTestSeverity[] = ['critical', 'high', 'medium', 'l
                       <span class="truncate text-xs font-medium text-ink">{{ failure.case_name }}</span>
                     </span>
                     <span class="mt-1 block truncate text-[10px] text-slate-400">
-                      {{ failure.model_id }} · {{ failure.provider_name }} · {{ failure.executed_at | date: 'short' }}
+                      {{ failure.model_id }} · {{ failure.provider_name }} · {{ failure.executed_at | msaDate: 'short' }}
                     </span>
                   </button>
                 } @empty {
@@ -551,7 +551,7 @@ const SEVERITY_ORDER: SecurityTestSeverity[] = ['critical', 'high', 'medium', 'l
                 <div>
                   <h2 class="msa-section-title">Run {{ shortId(run.id) }} results</h2>
                   <p class="text-xs text-muted">
-                    {{ run.status }} · {{ run.completed_results }}/{{ run.total_results }} complete · {{ run.created_at | date: 'medium' }}
+                    {{ run.status }} · {{ run.completed_results }}/{{ run.total_results }} complete · {{ run.created_at | msaDate: 'medium' }}
                   </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
@@ -612,7 +612,7 @@ const SEVERITY_ORDER: SecurityTestSeverity[] = ['critical', 'high', 'medium', 'l
                             }
                           </td>
                           <td class="max-w-[320px] px-3 py-3 text-[11px] text-slate-500">{{ result.rationale }}</td>
-                          <td class="px-5 py-3 text-right text-[11px] text-slate-500">{{ (result.executed_at || result.created_at) | date: 'short' }}</td>
+                          <td class="px-5 py-3 text-right text-[11px] text-slate-500">{{ (result.executed_at || result.created_at) | msaDate: 'short' }}</td>
                         </tr>
                       }
                     </tbody>
@@ -658,7 +658,7 @@ const SEVERITY_ORDER: SecurityTestSeverity[] = ['critical', 'high', 'medium', 'l
                     <span class="msa-label mb-1">Baseline (older)</span>
                     <select class="msa-input" (change)="compareBaselineId.set($any($event.target).value)" aria-label="Baseline run">
                       @for (run of runs(); track run.id) {
-                        <option [value]="run.id" [selected]="run.id === compareBaselineId()">Run {{ shortId(run.id) }} · {{ run.created_at | date: 'short' }}</option>
+                        <option [value]="run.id" [selected]="run.id === compareBaselineId()">Run {{ shortId(run.id) }} · {{ run.created_at | msaDate: 'short' }}</option>
                       }
                     </select>
                   </label>
@@ -666,7 +666,7 @@ const SEVERITY_ORDER: SecurityTestSeverity[] = ['critical', 'high', 'medium', 'l
                     <span class="msa-label mb-1">Current (newer)</span>
                     <select class="msa-input" (change)="compareCurrentId.set($any($event.target).value)" aria-label="Current run">
                       @for (run of runs(); track run.id) {
-                        <option [value]="run.id" [selected]="run.id === compareCurrentId()">Run {{ shortId(run.id) }} · {{ run.created_at | date: 'short' }}</option>
+                        <option [value]="run.id" [selected]="run.id === compareCurrentId()">Run {{ shortId(run.id) }} · {{ run.created_at | msaDate: 'short' }}</option>
                       }
                     </select>
                   </label>
@@ -757,7 +757,7 @@ const SEVERITY_ORDER: SecurityTestSeverity[] = ['critical', 'high', 'medium', 'l
               @if (result.severity) {
                 <span class="msa-badge" [class]="severityClass(result.severity)">{{ result.severity }}</span>
               }
-              <span class="text-[11px] text-slate-400">{{ result.executed_at | date: 'medium' }}</span>
+              <span class="text-[11px] text-slate-400">{{ result.executed_at | msaDate: 'medium' }}</span>
               @if (result.duration_ms !== null) {
                 <span class="text-[11px] text-slate-400">{{ result.duration_ms }} ms</span>
               }

@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import {
   Component,
   EventEmitter,
@@ -21,7 +21,7 @@ import {
 @Component({
   selector: 'msa-security-finding-detail',
   standalone: true,
-  imports: [DatePipe, IconComponent],
+  imports: [LocalDatePipe, IconComponent],
   template: `
     <div
       class="fixed inset-0 z-50 flex items-start justify-end bg-navy/40 p-0 backdrop-blur-sm sm:p-4"
@@ -89,7 +89,7 @@ import {
                 {{ finding.scan_target.label }}
               </p>
               <p class="mt-0.5 text-[11px] text-slate-500">
-                Scan {{ shortId(finding.scan) }} · detected {{ finding.detected_at | date: 'medium' }}
+                Scan {{ shortId(finding.scan) }} · detected {{ finding.detected_at | msaDate: 'medium' }}
               </p>
             </div>
           </div>
@@ -131,7 +131,7 @@ import {
                     {{ event.from_status || 'detected' }} → {{ event.to_status }}
                   </p>
                   <p class="text-[11px] text-slate-500">
-                    {{ event.actor_email || 'System' }} · {{ event.created_at | date: 'medium' }}
+                    {{ event.actor_email || 'System' }} · {{ event.created_at | msaDate: 'medium' }}
                   </p>
                   @if (event.note) {
                     <p class="mt-0.5 text-[11px] text-slate-600">{{ event.note }}</p>

@@ -275,7 +275,7 @@ export class LoginComponent {
     request.subscribe({
       next: () => {
         this.submitting.set(false);
-        void this.router.navigate(['/workspaces']);
+        void this.router.navigate([this.auth.landingRoute()]);
       },
       error: (error: unknown) => {
         this.submitting.set(false);

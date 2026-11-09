@@ -37,6 +37,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, db_index=True)
     display_name = models.CharField(max_length=200, blank=True)
+    # Validated, non-sensitive display preferences (timezone, date format,
+    # default workspace and landing page). Kept as JSON so adding a preference
+    # does not require a destructive schema change.
+    preferences = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

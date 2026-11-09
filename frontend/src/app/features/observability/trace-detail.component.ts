@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -22,7 +22,7 @@ interface RequestEntry {
 @Component({
   selector: 'msa-trace-detail',
   standalone: true,
-  imports: [DatePipe, RouterLink, IconComponent],
+  imports: [LocalDatePipe, RouterLink, IconComponent],
   template: `
     <div class="msa-page">
       <div class="mb-4">
@@ -56,7 +56,7 @@ interface RequestEntry {
             </p>
             <h1 class="msa-h1 truncate">{{ data.provider_name }} · {{ data.model_id }}</h1>
             <p class="msa-sub">
-              {{ data.started_at | date: 'medium' }} · trace {{ data.id }}
+              {{ data.started_at | msaDate: 'medium' }} · trace {{ data.id }}
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-2">

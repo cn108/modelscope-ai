@@ -7,6 +7,7 @@ from apps.playground.models import Execution
 from apps.playground.serializers import ExecutionSerializer
 from apps.playground.services import execution_for_user, rerun_execution
 from apps.workspaces.permissions import UUID_RE
+from common.throttling import ModelCallRateThrottle
 
 
 class ExecutionViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -18,6 +19,11 @@ class ExecutionViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         return Execution.objects.filter(
             project__workspace__memberships__user=self.request.user
         ).distinct()
+
+    def get_throttles(self):
+        if self.action == "rerun":
+            return [ModelCallRateThrottle()]
+        return super().get_throttles()
 
     def retrieve(self, request, *args, **kwargs):
         execution = execution_for_user(request.user, kwargs["pk"])

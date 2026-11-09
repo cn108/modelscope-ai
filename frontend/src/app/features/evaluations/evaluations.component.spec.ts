@@ -96,6 +96,13 @@ const EVALUATION = {
   completed_cases: 3,
   failed_cases: 0,
   summary: { totals: { models: 1, cases: 3, succeeded: 3, failed: 0 } },
+  review_summary: {
+    total_reviews: 0,
+    reviewed_results: 0,
+    labels: {},
+    disagreements: 0,
+    agreement_rate: null,
+  },
   error: null,
   created_by: 'user-1',
   created_at: '2026-01-03T00:00:00Z',

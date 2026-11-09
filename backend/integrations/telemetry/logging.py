@@ -8,9 +8,9 @@ trace id and a logging filter injects it into every record, so existing
 
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from contextvars import ContextVar
-import logging
 
 _TRACE_ID: ContextVar[str] = ContextVar("modelscope_trace_id", default="-")
 

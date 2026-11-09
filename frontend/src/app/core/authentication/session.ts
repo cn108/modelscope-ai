@@ -12,6 +12,10 @@ export function readAccessToken(): string | null {
   return storage()?.getItem(ACCESS_TOKEN_KEY) ?? null;
 }
 
+export function readRefreshToken(): string | null {
+  return storage()?.getItem(REFRESH_TOKEN_KEY) ?? null;
+}
+
 export function readStoredUser(): User | null {
   const raw = storage()?.getItem(USER_KEY);
   if (!raw) {

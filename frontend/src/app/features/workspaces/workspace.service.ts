@@ -9,6 +9,7 @@ import {
   Workspace,
   WorkspaceRole,
 } from '../../shared/models/workspace.model';
+import { AuditEventRow } from '../settings/settings.service';
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
@@ -21,6 +22,29 @@ export class WorkspaceService {
 
   create(name: string): Observable<Workspace> {
     return this.http.post<Workspace>(`${this.base}/`, { name });
+  }
+
+  update(
+    workspaceId: string,
+    input: { name?: string; settings?: Record<string, unknown> },
+  ): Observable<Workspace> {
+    return this.http.patch<Workspace>(`${this.base}/${workspaceId}/`, input);
+  }
+
+  delete(workspaceId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${workspaceId}/`);
+  }
+
+  exportData(workspaceId: string): Observable<Blob> {
+    return this.http.get(`${this.base}/${workspaceId}/export/`, {
+      responseType: 'blob',
+    });
+  }
+
+  audit(workspaceId: string): Observable<Paginated<AuditEventRow>> {
+    return this.http.get<Paginated<AuditEventRow>>(
+      `${this.base}/${workspaceId}/audit/`,
+    );
   }
 
   members(workspaceId: string): Observable<Paginated<Membership>> {

@@ -15,10 +15,10 @@ never raised into a model call.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass
 import logging
 import threading
+from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any, Iterator
 
 from django.conf import settings
@@ -95,10 +95,10 @@ def configure_tracing() -> dict[str, Any]:
             return dict(_STATUS)
 
         try:
+            from opentelemetry import trace as trace_api
             from opentelemetry.sdk.resources import Resource
             from opentelemetry.sdk.trace import TracerProvider
             from opentelemetry.sdk.trace.export import BatchSpanProcessor
-            from opentelemetry import trace as trace_api
         except ImportError:
             _STATUS = {
                 "enabled": False,

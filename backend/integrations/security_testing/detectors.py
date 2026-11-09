@@ -11,7 +11,12 @@ from __future__ import annotations
 import re
 
 from integrations.security import unsafe_output
-from integrations.security.base import SEVERITY_CRITICAL, SEVERITY_HIGH, SEVERITY_RANK, redact_excerpt
+from integrations.security.base import (
+    SEVERITY_CRITICAL,
+    SEVERITY_HIGH,
+    SEVERITY_RANK,
+    redact_excerpt,
+)
 from integrations.security.pii import scrub_pii
 
 from .base import FAILED, INCONCLUSIVE, PASSED, DetectionOutcome, RenderedCase

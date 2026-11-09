@@ -9,21 +9,21 @@ Design rules for M4:
   hardcoded response is used here.
 """
 
-from concurrent.futures import ThreadPoolExecutor
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
+from apps.observability.models import Trace
+from apps.observability.services import record_model_call
 from apps.playground.models import Execution, ExecutionResult
 from apps.prompts.services import project_for_user, prompt_for_user
 from apps.providers.models import ProviderConfig
 from apps.providers.services import adapter_for
 from apps.workspaces.models import Membership
 from apps.workspaces.permissions import require_membership
-from apps.observability.models import Trace
-from apps.observability.services import record_model_call
 from common.exceptions import ServiceUnavailable
 from integrations.providers.base import GenerationRequest
 from integrations.telemetry.tracing import model_call_span

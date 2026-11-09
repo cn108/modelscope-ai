@@ -16,23 +16,23 @@
 
 @layer components {
   .msa-page {
-    @apply mx-auto w-full max-w-[1400px] px-5 py-6 sm:px-8 sm:py-8;
+    @apply mx-auto w-full max-w-[1320px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8;
   }
 
   .msa-card {
-    @apply rounded-2xl border border-line bg-white shadow-card;
+    @apply rounded-xl border border-line bg-white shadow-card;
   }
 
   .msa-card-header {
-    @apply flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4;
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4 sm:px-6;
   }
 
   .msa-h1 {
-    @apply text-2xl font-semibold tracking-tight text-ink;
+    @apply text-[26px] font-semibold leading-tight tracking-[-0.02em] text-ink;
   }
 
   .msa-sub {
-    @apply mt-1 text-sm text-muted;
+    @apply mt-1.5 max-w-3xl text-sm leading-relaxed text-muted;
   }
 
   .msa-btn-base {
@@ -72,7 +72,7 @@
   }
 
   .msa-th {
-    @apply whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400;
+    @apply whitespace-nowrap px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400;
   }
 
   .msa-td {
@@ -81,6 +81,34 @@
 
   .msa-row {
     @apply border-t border-line/70;
+  }
+
+  .msa-table {
+    @apply w-full min-w-[640px] border-collapse text-left;
+  }
+
+  .msa-table thead {
+    @apply bg-canvas/70;
+  }
+
+  .msa-table th {
+    @apply whitespace-nowrap border-b border-line px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400;
+  }
+
+  .msa-table td {
+    @apply border-b border-line/70 px-4 py-3 align-middle text-xs text-slate-600;
+  }
+
+  .msa-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .msa-table tbody tr {
+    @apply transition-colors hover:bg-canvas/50;
+  }
+
+  .msa-empty {
+    @apply flex flex-col items-center px-6 py-12 text-center;
   }
 
   .msa-skeleton {

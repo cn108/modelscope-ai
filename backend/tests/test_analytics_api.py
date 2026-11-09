@@ -437,7 +437,6 @@ def test_model_performance_uses_rollups_then_live_history_and_scores(
 ):
     today = timezone.localdate()
     old_day = today - timedelta(days=10)
-    new_day = today - timedelta(days=1)
     old_at = timezone.make_aware(
         datetime.combine(old_day, time.min)
     ) + timedelta(hours=12)

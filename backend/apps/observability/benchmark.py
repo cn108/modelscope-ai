@@ -16,7 +16,8 @@ workspace-scoped aggregation path used by the public API.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time as dt_time, timedelta
+from datetime import datetime, timedelta
+from datetime import time as dt_time
 from decimal import Decimal
 from statistics import median
 from time import perf_counter

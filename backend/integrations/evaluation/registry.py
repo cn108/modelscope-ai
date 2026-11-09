@@ -22,6 +22,7 @@ from integrations.evaluation.metrics import REFERENCE_SCORERS, judge_score
 
 JUDGE_THRESHOLD = 0.5
 MAX_METRICS_PER_RUN = 6
+CUSTOM_METRICS: dict[str, "MetricDefinition"] = {}
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,7 @@ class MetricDefinition:
     requires_judge: bool = False
     threshold: float | None = None
     source: str = "builtin"
+    version: str = "1.0"
     scorer: Callable[..., float] | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -46,6 +48,7 @@ class MetricDefinition:
             "requires_judge": self.requires_judge,
             "threshold": self.threshold,
             "source": self.source,
+            "version": self.version,
         }
 
 
@@ -70,6 +73,44 @@ BUILTIN_METRICS: tuple[MetricDefinition, ...] = (
         description="Word-overlap F1 between the response and the expected answer.",
         requires_expected_output=True,
         scorer=REFERENCE_SCORERS["token_f1"],
+    ),
+    MetricDefinition(
+        key="factual_correctness",
+        label="Factual correctness (reference)",
+        description=(
+            "Reference-overlap heuristic with extra weight on exact numbers. "
+            "It measures agreement, not verified truth."
+        ),
+        requires_expected_output=True,
+        threshold=0.5,
+        scorer=REFERENCE_SCORERS["factual_correctness"],
+    ),
+    MetricDefinition(
+        key="context_precision",
+        label="Context precision",
+        description="Average lexical relevance of retrieved context to the query.",
+        requires_context=True,
+        threshold=0.5,
+        scorer=REFERENCE_SCORERS["context_precision"],
+    ),
+    MetricDefinition(
+        key="context_recall",
+        label="Context recall",
+        description="Fraction of expected-answer terms found in retrieved context.",
+        requires_expected_output=True,
+        requires_context=True,
+        threshold=0.5,
+        scorer=REFERENCE_SCORERS["context_recall"],
+    ),
+    MetricDefinition(
+        key="toxicity",
+        label="Toxicity screen",
+        description=(
+            "Lexicon-based screen; 1 is clean and 0 is strongly toxic. "
+            "Not a safety guarantee."
+        ),
+        threshold=0.8,
+        scorer=REFERENCE_SCORERS["toxicity"],
     ),
 )
 
@@ -110,10 +151,29 @@ def judge_metrics_available() -> bool:
     return importlib.util.find_spec("deepeval") is not None
 
 
+def register_metric(definition: MetricDefinition) -> None:
+    """Register a custom evaluator without changing orchestration code.
+
+    Custom metrics run in-process with the same contract as built-ins. Only
+    trusted deployment code should call this; there is intentionally no HTTP
+    endpoint that accepts executable metric code.
+    """
+    if definition.requires_judge or definition.scorer is None:
+        raise ValueError("Custom metrics need an in-process scorer and no judge.")
+    if not definition.key or definition.key in {item.key for item in definitions()}:
+        raise ValueError("A metric with this key already exists.")
+    CUSTOM_METRICS[definition.key] = definition
+
+
+def unregister_metric(key: str) -> None:
+    CUSTOM_METRICS.pop(key, None)
+
+
 def definitions() -> tuple[MetricDefinition, ...]:
+    base = BUILTIN_METRICS + tuple(CUSTOM_METRICS.values())
     if judge_metrics_available():
-        return BUILTIN_METRICS + JUDGE_METRICS
-    return BUILTIN_METRICS
+        return base + JUDGE_METRICS
+    return base
 
 
 def catalog() -> list[dict[str, Any]]:
@@ -162,6 +222,7 @@ def evaluate(
         "score": None,
         "passed": None,
         "threshold": definition.threshold,
+        "metric_version": definition.version,
         "reason": "",
         "error": None,
     }
@@ -185,11 +246,16 @@ def evaluate(
             )
             result.update(outcome)
         else:
-            score = definition.scorer(
-                case.get("actual_output") or "", case.get("expected_output") or ""
+            scorer = definition.scorer
+            assert scorer is not None  # registry validation prevents this
+            score = scorer(
+                case.get("actual_output") or "",
+                case.get("expected_output") or "",
+                case.get("context") or [],
             )
+            threshold = definition.threshold if definition.threshold is not None else 1.0
             result["score"] = float(score)
-            result["passed"] = bool(score >= 1.0)
+            result["passed"] = bool(score >= threshold)
     except Exception as exc:  # noqa: BLE001 - a judge failure is data, not a crash
         message = str(exc).strip() or "The metric could not be computed."
         result["error"] = message[:400]

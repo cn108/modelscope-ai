@@ -8,7 +8,6 @@ select reviewed cases from the registry and models configured in the project.
 from __future__ import annotations
 
 import logging
-from collections import Counter
 from uuid import UUID
 
 from django.conf import settings
@@ -23,9 +22,13 @@ from apps.providers.models import ModelConfig, ProviderConfig
 from apps.providers.services import generate_observed
 from apps.workspaces.models import Membership
 from apps.workspaces.permissions import require_membership
-from integrations.security.base import SEVERITY_RANK
 from integrations.security_testing import registry
-from integrations.security_testing.base import FAILED, INCONCLUSIVE, PASSED, RenderedCase
+from integrations.security_testing.base import (
+    FAILED,
+    INCONCLUSIVE,
+    PASSED,
+    RenderedCase,
+)
 from integrations.security_testing.cases import CASES_BY_KEY
 from integrations.security_testing.detectors import classify, severity_for
 

@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { LocalDatePipe } from '../../shared/pipes/local-date.pipe';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { catchError, forkJoin, map, of } from 'rxjs';
 
@@ -26,7 +26,7 @@ type Slot = 'a' | 'b';
 @Component({
   selector: 'msa-playground',
   standalone: true,
-  imports: [DatePipe, IconComponent],
+  imports: [LocalDatePipe, IconComponent],
   template: `
     <div class="msa-page">
       <header class="flex flex-wrap items-end justify-between gap-4">
@@ -292,7 +292,7 @@ type Slot = 'a' | 'b';
                       {{ execution.mode === 'compare' ? 'Comparison' : 'Response' }}
                     </h2>
                     <p class="text-xs text-muted">
-                      {{ execution.created_at | date: 'medium' }} ·
+                      {{ execution.created_at | msaDate: 'medium' }} ·
                       {{ execution.results.length }} model{{
                         execution.results.length === 1 ? '' : 's'
                       }}
@@ -388,7 +388,7 @@ type Slot = 'a' | 'b';
                           {{ execution.user_prompt }}
                         </span>
                         <span class="block truncate text-[11px] text-slate-400">
-                          {{ execution.created_at | date: 'medium' }} ·
+                          {{ execution.created_at | msaDate: 'medium' }} ·
                           {{ modelSummary(execution) }}
                         </span>
                       </span>
@@ -534,7 +534,7 @@ type Slot = 'a' | 'b';
                                       v{{ version.version_number }}
                                     </span>
                                     <span class="text-[10px] text-slate-400">
-                                      {{ version.created_at | date: 'short' }}
+                                      {{ version.created_at | msaDate: 'short' }}
                                     </span>
                                   </div>
                                   <p class="mt-1 line-clamp-3 whitespace-pre-wrap text-[11px] text-slate-500">
