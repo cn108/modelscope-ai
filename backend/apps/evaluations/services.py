@@ -7,7 +7,9 @@ a metric never requires touching this module or any page.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from statistics import mean
+import time
 from typing import Any
 
 from django.db import transaction
@@ -17,10 +19,12 @@ from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.datasets.services import dataset_for_user
 from apps.evaluations.models import Evaluation, EvaluationModel, EvaluationResult
+from apps.observability.models import Trace
+from apps.observability.services import record_model_call
 from apps.projects.services import project_for_user
 from apps.prompts.serializers import validate_parameters
 from apps.providers.models import ProviderConfig
-from apps.providers.services import generate_once
+from apps.providers.services import generate_observed
 from apps.workspaces.models import Membership
 from apps.workspaces.permissions import require_membership
 from integrations.evaluation.registry import (
@@ -28,6 +32,7 @@ from integrations.evaluation.registry import (
     evaluate as evaluate_metric,
     resolve_metrics,
 )
+from integrations.telemetry.tracing import model_call_span
 
 MAX_MODELS_PER_RUN = 5
 TERMINAL_STATUSES = (Evaluation.Status.COMPLETED, Evaluation.Status.FAILED)
@@ -224,6 +229,78 @@ def enqueue_evaluation(evaluation: Evaluation) -> Evaluation:
     return evaluation
 
 
+class _JudgeObserver:
+    """Record each DeepEval judge call against the case currently being scored."""
+
+    def __init__(self, evaluation: Evaluation):
+        self.evaluation = evaluation
+        self.result: EvaluationResult | None = None
+
+    def __call__(
+        self,
+        *,
+        result,
+        prompt: str,
+        error: dict | None,
+        started_at,
+        ended_at,
+        duration_ms: float,
+    ) -> None:
+        row = self.result
+        provider = self.evaluation.judge_provider
+        if row is None or provider is None:
+            return
+        error_payload = error or None
+        provider_latency = (
+            result.latency_ms
+            if result is not None and result.latency_ms is not None
+            else duration_ms
+        )
+        spans = [
+            {
+                "name": "judge.call",
+                "kind": "client",
+                "status": "error" if error_payload else "ok",
+                "started_at": started_at,
+                "ended_at": ended_at,
+                "duration_ms": provider_latency,
+                "attributes": {
+                    "gen_ai.provider.name": provider.kind,
+                    "gen_ai.request.model": self.evaluation.judge_model_id,
+                    "gen_ai.usage.input_tokens": (
+                        result.input_tokens if result else None
+                    ),
+                    "gen_ai.usage.output_tokens": (
+                        result.output_tokens if result else None
+                    ),
+                },
+                "error": error_payload,
+            }
+        ]
+        record_model_call(
+            project=self.evaluation.project,
+            source=Trace.Source.EVALUATION,
+            role=Trace.Role.JUDGE,
+            provider=provider,
+            provider_name=self.evaluation.judge_provider_name,
+            provider_kind=provider.kind,
+            model_id=self.evaluation.judge_model_id,
+            status=Trace.Status.FAILED if error_payload else Trace.Status.SUCCEEDED,
+            started_at=started_at,
+            ended_at=ended_at,
+            duration_ms=duration_ms,
+            provider_latency_ms=provider_latency,
+            input_tokens=result.input_tokens if result else None,
+            output_tokens=result.output_tokens if result else None,
+            error=error_payload,
+            attributes={"judge": True, "dataset_name": self.evaluation.dataset_name},
+            request_text=prompt,
+            response_text=(result.content or "") if result else "",
+            evaluation_result=row,
+            spans=spans,
+        )
+
+
 def _build_judge(evaluation: Evaluation, definitions: list[MetricDefinition]):
     if not any(definition.requires_judge for definition in definitions):
         return None
@@ -232,11 +309,15 @@ def _build_judge(evaluation: Evaluation, definitions: list[MetricDefinition]):
     try:
         from integrations.evaluation.judge import build_judge
 
-        return build_judge(
+        observer = _JudgeObserver(evaluation)
+        judge = build_judge(
             evaluation.judge_provider,
             evaluation.judge_model_id,
             evaluation.judge_parameters or {},
+            on_call=observer,
         )
+        judge.observer = observer
+        return judge
     except Exception:  # noqa: BLE001 - judge unavailability becomes a metric error
         return None
 
@@ -283,6 +364,161 @@ def _model_summary(model_row: EvaluationModel, rows: list[EvaluationResult]) -> 
     }
 
 
+def _evaluation_spans(
+    *,
+    timing: dict,
+    generation,
+    error: dict | None,
+    metric_timings: list[dict],
+    metrics_started_at,
+    metrics_ended_at,
+) -> list[dict]:
+    """Build prepare/generate/metric spans for one evaluation case."""
+    spans: list[dict] = []
+    prepare_started = timing["started_at"]
+    prepare_ms = timing.get("prepare_ms") or 0
+    prepare_ended = prepare_started + timedelta(milliseconds=prepare_ms)
+    spans.append(
+        {
+            "name": "provider.prepare",
+            "kind": "internal",
+            "status": "error" if error and not timing.get("generate_started_at") else "ok",
+            "started_at": prepare_started,
+            "ended_at": prepare_ended,
+            "duration_ms": prepare_ms,
+            "attributes": {"gen_ai.request.model": generation.model_id if generation else None},
+            "error": error if error and not timing.get("generate_started_at") else None,
+        }
+    )
+    if timing.get("generate_started_at"):
+        generate_ms = timing.get("generate_ms") or 0
+        if generation is not None and generation.latency_ms is not None:
+            generate_ms = generation.latency_ms
+        spans.append(
+            {
+                "name": "provider.generate",
+                "kind": "client",
+                "status": "error" if error else "ok",
+                "started_at": timing["generate_started_at"],
+                "ended_at": timing.get("ended_at") or prepare_ended,
+                "duration_ms": generate_ms,
+                "attributes": {
+                    "gen_ai.usage.input_tokens": (
+                        generation.input_tokens if generation else None
+                    ),
+                    "gen_ai.usage.output_tokens": (
+                        generation.output_tokens if generation else None
+                    ),
+                    "finish_reason": generation.finish_reason if generation else None,
+                },
+                "error": error,
+            }
+        )
+
+    if metric_timings and metrics_started_at and metrics_ended_at:
+        parent_index = len(spans)
+        metric_error = any(item.get("error") for item in metric_timings)
+        spans.append(
+            {
+                "name": "metrics.evaluate",
+                "kind": "internal",
+                "status": "error" if metric_error else "ok",
+                "started_at": metrics_started_at,
+                "ended_at": metrics_ended_at,
+                "duration_ms": round(
+                    (metrics_ended_at - metrics_started_at).total_seconds() * 1000, 2
+                ),
+                "attributes": {
+                    "metrics": [item["metric"] for item in metric_timings],
+                },
+                "error": (
+                    {
+                        "category": "metric_errors",
+                        "message": "One or more metrics could not be scored.",
+                    }
+                    if metric_error
+                    else None
+                ),
+            }
+        )
+        for item in metric_timings:
+            spans.append(
+                {
+                    "name": f"metrics.{item['metric']}",
+                    "kind": "internal",
+                    "parent": parent_index,
+                    "status": "error" if item.get("error") else "ok",
+                    "started_at": item["started_at"],
+                    "ended_at": item["ended_at"],
+                    "duration_ms": item["duration_ms"],
+                    "attributes": {
+                        "metric": item["metric"],
+                        "score": item.get("score"),
+                        "passed": item.get("passed"),
+                        "threshold": item.get("threshold"),
+                        "reason": (item.get("reason") or "")[:400],
+                    },
+                    "error": (
+                        {"category": "metric_error", "message": item["error"][:400]}
+                        if item.get("error")
+                        else None
+                    ),
+                }
+            )
+    return spans
+
+
+def _record_evaluation_trace(
+    *,
+    evaluation: Evaluation,
+    model_row: EvaluationModel,
+    row: EvaluationResult,
+    generation,
+    error: dict | None,
+    timing: dict | None,
+    spans: list[dict],
+) -> None:
+    started_at = timing["started_at"] if timing else timezone.now()
+    ended_at = (
+        spans[-1]["ended_at"] if spans and spans[-1].get("ended_at") else None
+    ) or (timing.get("ended_at") if timing else None) or started_at
+    duration_ms = max((ended_at - started_at).total_seconds() * 1000, 0.0)
+    record_model_call(
+        project=evaluation.project,
+        source=Trace.Source.EVALUATION,
+        role=Trace.Role.MODEL,
+        provider=model_row.provider,
+        provider_name=model_row.provider_name,
+        provider_kind=model_row.provider_kind,
+        model_id=model_row.model_id,
+        status=(
+            Trace.Status.SUCCEEDED
+            if row.status == EvaluationResult.Status.SUCCEEDED
+            else Trace.Status.FAILED
+        ),
+        started_at=started_at,
+        ended_at=ended_at,
+        duration_ms=duration_ms,
+        provider_latency_ms=(
+            generation.latency_ms
+            if generation is not None and generation.latency_ms is not None
+            else (timing.get("generate_ms") if timing else None)
+        ),
+        input_tokens=generation.input_tokens if generation else None,
+        output_tokens=generation.output_tokens if generation else None,
+        error=error,
+        attributes={
+            "dataset_name": evaluation.dataset_name,
+            "dataset_version": evaluation.dataset_version,
+            "record_position": row.record_position,
+            "metrics": evaluation.metrics,
+        },
+        otel_trace_id=(timing or {}).get("otel_trace_id", ""),
+        evaluation_result=row,
+        spans=spans,
+    )
+
+
 def _run_model(
     evaluation: Evaluation,
     model_row: EvaluationModel,
@@ -301,6 +537,33 @@ def _run_model(
         for row in rows:
             if row.status == EvaluationResult.Status.PENDING:
                 _fail_result(row, error)
+                now = timezone.now()
+                record_model_call(
+                    project=evaluation.project,
+                    source=Trace.Source.EVALUATION,
+                    role=Trace.Role.MODEL,
+                    provider=None,
+                    provider_name=model_row.provider_name,
+                    provider_kind=model_row.provider_kind,
+                    model_id=model_row.model_id,
+                    status=Trace.Status.FAILED,
+                    started_at=now,
+                    ended_at=now,
+                    duration_ms=0.0,
+                    error=error,
+                    evaluation_result=row,
+                    spans=[
+                        {
+                            "name": "provider.resolve",
+                            "kind": "internal",
+                            "status": "error",
+                            "started_at": now,
+                            "ended_at": now,
+                            "duration_ms": 0.0,
+                            "error": error,
+                        }
+                    ],
+                )
         model_row.status = EvaluationModel.Status.FAILED
         model_row.error = error
         model_row.summary = _model_summary(model_row, rows)
@@ -316,12 +579,15 @@ def _run_model(
     for row in rows:
         if row.status != EvaluationResult.Status.PENDING:
             continue
-        generation, error = generate_once(
+        generation, error, timing = generate_observed(
             provider=model_row.provider,
             model_id=model_row.model_id,
             messages=[{"role": "user", "content": row.input}],
             parameters=parameters,
         )
+        metric_timings: list[dict] = []
+        metrics_started_at = None
+        metrics_ended_at = None
         if error:
             _fail_result(row, error)
         else:
@@ -336,9 +602,47 @@ def _run_model(
                 "expected_output": row.expected_output,
                 "context": row.context or [],
             }
+            metrics_started_at = timezone.now()
+            observer = getattr(judge, "observer", None) if judge is not None else None
+            if observer is not None:
+                observer.result = row
+            with model_call_span(
+                "metrics.evaluate",
+                attributes={
+                    "evaluation.id": str(evaluation.pk),
+                    "evaluation.metrics": ",".join(evaluation.metrics),
+                },
+            ) as metrics_span:
+                try:
+                    for definition in definitions:
+                        started_at = timezone.now()
+                        started = time.monotonic()
+                        outcome = evaluate_metric(definition, case=case, judge=judge)
+                        ended_at = timezone.now()
+                        metric_timings.append(
+                            {
+                                **outcome,
+                                "started_at": started_at,
+                                "ended_at": ended_at,
+                                "duration_ms": round(
+                                    (time.monotonic() - started) * 1000, 2
+                                ),
+                            }
+                        )
+                        if outcome.get("error"):
+                            metrics_span.record_error(
+                                {
+                                    "category": "metric_error",
+                                    "message": str(outcome["error"])[:400],
+                                }
+                            )
+                finally:
+                    if observer is not None:
+                        observer.result = None
+            metrics_ended_at = timezone.now()
             metric_results = [
-                evaluate_metric(definition, case=case, judge=judge)
-                for definition in definitions
+                {key: value for key, value in item.items() if key not in {"started_at", "ended_at", "duration_ms"}}
+                for item in metric_timings
             ]
             row.metric_results = metric_results
             row.scores = {
@@ -361,6 +665,23 @@ def _run_model(
                     "updated_at",
                 ]
             )
+
+        _record_evaluation_trace(
+            evaluation=evaluation,
+            model_row=model_row,
+            row=row,
+            generation=generation,
+            error=error,
+            timing=timing,
+            spans=_evaluation_spans(
+                timing=timing,
+                generation=generation,
+                error=error,
+                metric_timings=metric_timings,
+                metrics_started_at=metrics_started_at,
+                metrics_ended_at=metrics_ended_at,
+            ),
+        )
 
         Evaluation.objects.filter(pk=evaluation.pk).update(
             completed_cases=F("completed_cases") + 1,

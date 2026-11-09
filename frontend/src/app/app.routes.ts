@@ -49,6 +49,20 @@ export const routes: Routes = [
             (m) => m.EvaluationsComponent,
           ),
       },
+      {
+        path: 'observability',
+        loadComponent: () =>
+          import('./features/observability/observability.component').then(
+            (m) => m.ObservabilityComponent,
+          ),
+      },
+      {
+        path: 'observability/traces/:id',
+        loadComponent: () =>
+          import('./features/observability/trace-detail.component').then(
+            (m) => m.TraceDetailComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

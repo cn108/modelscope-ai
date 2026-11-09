@@ -11,3 +11,5 @@ cryptography~=42.0
 python-dotenv~=1.0
 gunicorn~=21.2
 deepeval~=4.3
+opentelemetry-sdk~=1.45
+opentelemetry-exporter-otlp-proto-http~=1.45

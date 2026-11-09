@@ -1,4 +1,4 @@
-# ModelScope AI — Implementation Plan (Milestones 1–5)
+# ModelScope AI — Implementation Plan (Milestones 1–6)
 
 Date: 2026-11-09 · Baseline: `ModelScope_AI_Coding_Agent_Specification.pdf` v1.0
 
@@ -25,7 +25,10 @@ added the playground, execution history and versioned prompts; see
 validated imports and record management, the metric registry (built-in scorers
 plus DeepEval judge metrics), and Celery-backed evaluations with immutable
 per-case results and repeatable reruns; see
-[MILESTONE-5.md](milestones/MILESTONE-5.md).
+[MILESTONE-5.md](milestones/MILESTONE-5.md). Milestone 6 added execution
+traces and spans on the existing playground and evaluation paths, latency and
+token metrics, explicit cost estimates, a filterable observability dashboard
+and a trace explorer; see [MILESTONE-6.md](milestones/MILESTONE-6.md).
 
 ## 3. Environment limitation (documented, not hidden)
 
@@ -44,7 +47,7 @@ The Docker CLI is present, but the daemon is **not reachable from this developme
 3. SimpleJWT is used for authentication; JWT signing follows the runtime `SECRET_KEY`.
 4. Provider credential encryption helper (Fernet, key from env) lands in `common/encryption` early;
    the key never enters source control.
-5. Sentry/OTLP exporter endpoints stay unconfigured by default; OpenTelemetry wiring remains Milestone 6.
+5. Sentry/OTLP exporter endpoints stay unconfigured by default. OpenTelemetry wiring is present as of Milestone 6: database traces always record, and OTLP/HTTP export is opt-in through `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ## 5. Initial directory structure
 
@@ -69,9 +72,10 @@ docs/{IMPLEMENTATION_PLAN.md, milestones/, adr/}
 |---|---|---|
 | Migrations apply cleanly | `python manage.py migrate --settings=config.settings.test` | pass on SQLite test DB; live PostgreSQL unverified |
 | DB connectivity via health | `pytest tests/test_health.py` | pass |
-| Celery/Redis round trip | `pytest tests/test_health.py` (eager mode); M5 live check used a real worker over the filesystem broker | partial — real worker exercised; live Redis/PostgreSQL pending a host |
-| Backend tests | `pytest` | pass — 103 passed |
+| Celery/Redis round trip | `pytest tests/test_health.py` (eager mode); M5/M6 live checks used a real worker over the filesystem broker | partial — real worker exercised; live Redis/PostgreSQL pending a host |
+| Backend tests | `pytest` | pass — 120 passed |
 | Frontend builds | `npx ng build` | pass |
+| Frontend specs | `npx ng test --watch=false --browsers=ChromeHeadless` | pass — 21 specs |
 | No secrets committed | `git ls-files` + secret grep scan | pass — no `.env` tracked |
 | README and `.env.example` | file existence | partial — `.env.example` added; full README outstanding |
 | CI workflow | `.github/workflows/ci.yml` | present — Django and Angular jobs, green on `main` |
@@ -115,3 +119,16 @@ relevancy), Celery-backed runs with queued/running/completed/failed status,
 per-case result persistence, aggregate summaries, model comparison and
 repeatable reruns against frozen snapshots. Full report:
 [MILESTONE-5.md](milestones/MILESTONE-5.md).
+
+### Milestone 6 — Observability
+
+Status: **complete against its exit criteria** — execution traces and span
+trees are written from real Playground, Evaluation and judge calls; the
+dashboard aggregates latency, tokens, failures, model/provider usage and
+explicitly configured estimated costs; the trace explorer resolves the linked
+execution or evaluation and displays its spans, request, response and errors.
+The live check ran 4 real calls through a Celery worker and read the records
+back from both the API and the Angular UI. Completed days are also aggregated
+into daily rollups by a scheduled maintenance task, and raw trace retention is
+configurable; the dashboard reads rollups for old days and raw traces for the
+live edge. Full report: [MILESTONE-6.md](milestones/MILESTONE-6.md).

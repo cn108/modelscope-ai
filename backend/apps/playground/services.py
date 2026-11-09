@@ -10,8 +10,10 @@ Design rules for M4:
 """
 
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.playground.models import Execution, ExecutionResult
@@ -20,8 +22,11 @@ from apps.providers.models import ProviderConfig
 from apps.providers.services import adapter_for
 from apps.workspaces.models import Membership
 from apps.workspaces.permissions import require_membership
+from apps.observability.models import Trace
+from apps.observability.services import record_model_call
 from common.exceptions import ServiceUnavailable
 from integrations.providers.base import GenerationRequest
+from integrations.telemetry.tracing import model_call_span
 
 MAX_PROMPT_LENGTH = 20_000
 
@@ -50,47 +55,83 @@ def _clean_error(exc: Exception) -> dict[str, str]:
 
 def _prepare(provider, model_id, model_parameters, position):
     """Build the adapter on the request thread; decryption touches the DB."""
+    started_at = timezone.now()
+    started = time.monotonic()
+    adapter = None
+    error = None
     try:
         adapter = adapter_for(provider)
     except (ValidationError, ServiceUnavailable, ValueError) as exc:
-        return {
-            "position": position,
-            "provider": provider,
-            "adapter": None,
-            "model_id": model_id,
-            "model_parameters": model_parameters,
-            "error": _clean_error(exc),
-        }
+        error = _clean_error(exc)
+    ended_at = timezone.now()
     return {
         "position": position,
         "provider": provider,
         "adapter": adapter,
         "model_id": model_id,
         "model_parameters": model_parameters,
-        "error": None,
+        "error": error,
+        "prepare_started_at": started_at,
+        "prepare_ended_at": ended_at,
+        "prepare_ms": round((time.monotonic() - started) * 1000, 2),
     }
 
 
 def _generate(item, messages, parameters):
+    timing = {
+        "started_at": None,
+        "ended_at": None,
+        "duration_ms": None,
+        "otel_trace_id": "",
+    }
     if item["error"]:
-        return item, None, item["error"]
+        return item, None, item["error"], timing
+
+    started_at = timezone.now()
+    started = time.monotonic()
+    result = None
+    error = None
     try:
-        result = item["adapter"].generate(
-            GenerationRequest(
-                model_id=item["model_id"], messages=messages, parameters=parameters
-            )
-        )
-    except Exception:  # noqa: BLE001 - never leak provider SDK/transport details
-        return item, None, {
-            "category": "provider_error",
-            "message": "The provider call failed unexpectedly.",
-        }
-    if result.error:
-        return item, None, {
+        with model_call_span(
+            "provider.generate",
+            attributes={
+                "gen_ai.provider.name": item["provider"].kind,
+                "gen_ai.request.model": item["model_id"],
+            },
+        ) as span:
+            try:
+                result = item["adapter"].generate(
+                    GenerationRequest(
+                        model_id=item["model_id"],
+                        messages=messages,
+                        parameters=parameters,
+                    )
+                )
+            except Exception:  # noqa: BLE001 - never leak provider SDK details
+                error = {
+                    "category": "provider_error",
+                    "message": "The provider call failed unexpectedly.",
+                }
+            if error:
+                span.record_error(error)
+            elif result is not None and result.error:
+                span.record_error(result.error)
+            timing["otel_trace_id"] = span.trace_id
+    finally:
+        ended_at = timezone.now()
+        timing["started_at"] = started_at
+        timing["ended_at"] = ended_at
+        timing["duration_ms"] = round((time.monotonic() - started) * 1000, 2)
+
+    if error is None and result is not None and result.error:
+        error = {
             "category": str(result.error.get("category", "provider_error"))[:80],
             "message": str(result.error.get("message", "Provider call failed."))[:400],
         }
-    return item, result, None
+    if error is not None:
+        # Match the existing contract: a failed call has no usable result row.
+        result = None
+    return item, result, error, timing
 
 
 def _persist(
@@ -127,7 +168,7 @@ def _persist(
             status=status,
             created_by=actor,
         )
-        ExecutionResult.objects.bulk_create(
+        result_rows = ExecutionResult.objects.bulk_create(
             [
                 ExecutionResult(
                     execution=execution,
@@ -169,7 +210,99 @@ def _persist(
                 for entry in entries
             ]
         )
+        by_position = {row.position: row for row in result_rows}
+        for entry in entries:
+            _record_entry_trace(
+                project=project,
+                mode=mode,
+                entry=entry,
+                result_row=by_position[entry["position"]],
+            )
     return execution
+
+
+def _record_entry_trace(*, project, mode, entry, result_row):
+    """Persist the trace for one model call, including its span tree."""
+    item = entry["item"]
+    timing = entry["timing"]
+    spans = [
+        {
+            "name": "provider.prepare",
+            "kind": "internal",
+            "status": "error" if item["error"] else "ok",
+            "started_at": item["prepare_started_at"],
+            "ended_at": item["prepare_ended_at"],
+            "duration_ms": item["prepare_ms"],
+            "attributes": {
+                "provider.kind": item["provider"].kind,
+                "provider.name": item["provider"].name,
+                "gen_ai.request.model": item["model_id"],
+            },
+            "error": item["error"],
+        }
+    ]
+    if not item["error"]:
+        result = entry["result"]
+        generate_ms = timing["duration_ms"]
+        if result is not None and result.latency_ms is not None:
+            generate_ms = result.latency_ms
+        spans.append(
+            {
+                "name": "provider.generate",
+                "kind": "client",
+                "status": "error" if entry["error"] else "ok",
+                "started_at": timing["started_at"],
+                "ended_at": timing["ended_at"],
+                "duration_ms": generate_ms,
+                "attributes": {
+                    "gen_ai.request.model": item["model_id"],
+                    "gen_ai.usage.input_tokens": (
+                        result.input_tokens if result else None
+                    ),
+                    "gen_ai.usage.output_tokens": (
+                        result.output_tokens if result else None
+                    ),
+                    "finish_reason": result.finish_reason if result else None,
+                    "request_id": result.request_id if result else None,
+                },
+                "error": entry["error"],
+            }
+        )
+
+    started_at = item["prepare_started_at"]
+    ended_at = timing["ended_at"] or item["prepare_ended_at"]
+    duration_ms = max((ended_at - started_at).total_seconds() * 1000, 0.0)
+    record_model_call(
+        project=project,
+        source=Trace.Source.PLAYGROUND,
+        role=Trace.Role.MODEL,
+        provider=item["provider"],
+        provider_name=item["provider"].name,
+        provider_kind=item["provider"].kind,
+        model_id=item["model_id"],
+        status=(
+            Trace.Status.SUCCEEDED if entry["result"] else Trace.Status.FAILED
+        ),
+        started_at=started_at,
+        ended_at=ended_at,
+        duration_ms=duration_ms,
+        provider_latency_ms=(
+            entry["result"].latency_ms
+            if entry["result"] is not None
+            else timing["duration_ms"]
+        ),
+        input_tokens=(
+            entry["result"].input_tokens if entry["result"] else None
+        ),
+        output_tokens=(
+            entry["result"].output_tokens if entry["result"] else None
+        ),
+        error=entry["error"],
+        attributes={"mode": mode, "model_position": entry["position"]},
+        otel_trace_id=timing["otel_trace_id"],
+        execution_result=result_row,
+        spans=spans,
+    )
 
 
 def _run(*, actor, project, snapshot, selections):
@@ -202,15 +335,17 @@ def _run(*, actor, project, snapshot, selections):
             "position": item["position"],
             "provider": item["provider"],
             "model_id": item["model_id"],
+            "item": item,
             "result": result,
             "error": error,
+            "timing": timing,
             "status": (
                 ExecutionResult.Status.SUCCEEDED
                 if result
                 else ExecutionResult.Status.FAILED
             ),
         }
-        for item, result, error in outcomes
+        for item, result, error, timing in outcomes
     ]
     entries.sort(key=lambda entry: entry["position"])
     return _persist(

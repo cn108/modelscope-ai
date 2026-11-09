@@ -9,6 +9,11 @@ from rest_framework.routers import DefaultRouter
 from apps.playground.views import ExecutionViewSet
 from apps.datasets.views import DatasetRecordViewSet, DatasetViewSet
 from apps.evaluations.views import EvaluationMetricCatalogView, EvaluationViewSet
+from apps.observability.views import (
+    ProjectObservabilityView,
+    ProjectTraceListView,
+    TraceDetailView,
+)
 from apps.projects.views import ProjectViewSet
 from apps.prompts.views import PromptViewSet
 from apps.providers.views import ProviderViewSet
@@ -47,6 +52,21 @@ api_v1_patterns = [
         "evaluation-metrics/",
         EvaluationMetricCatalogView.as_view(),
         name="evaluation-metrics",
+    ),
+    path(
+        "projects/<uuid:project_id>/observability/",
+        ProjectObservabilityView.as_view(),
+        name="project-observability",
+    ),
+    path(
+        "projects/<uuid:project_id>/observability/traces/",
+        ProjectTraceListView.as_view(),
+        name="project-observability-traces",
+    ),
+    path(
+        "observability/traces/<uuid:trace_id>/",
+        TraceDetailView.as_view(),
+        name="observability-trace",
     ),
     path("auth/", include("apps.accounts.urls")),
     path("", include(router.urls)),

@@ -6,10 +6,12 @@ the playground, so evaluation never introduces a second provider path.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import os
 import re
-from typing import Any
+import time
+from typing import Any, Callable
 
 os.environ.setdefault("DEEPEVAL_TELEMETRY_OPT_OUT", "YES")
 os.environ.setdefault("DEEPEVAL_ERROR_REPORTING", "NO")
@@ -40,10 +42,17 @@ def extract_json(text: str) -> str:
 class ProviderJudge(DeepEvalBaseLLM):
     """A DeepEval model that proxies through a provider adapter."""
 
-    def __init__(self, adapter, model_id: str, parameters: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        adapter,
+        model_id: str,
+        parameters: dict[str, Any] | None = None,
+        on_call: Callable[..., None] | None = None,
+    ):
         self.adapter = adapter
         self.model_id = model_id
         self.parameters = parameters or {}
+        self.on_call = on_call
         self.calls = 0
         super().__init__(model_id)
 
@@ -53,15 +62,60 @@ class ProviderJudge(DeepEvalBaseLLM):
     def get_model_name(self) -> str:
         return f"modelscope:{self.model_id}"
 
+    def _notify(self, **payload) -> None:
+        """Best-effort observability hook; it can never fail a judge call."""
+        if self.on_call is None:
+            return
+        try:
+            self.on_call(**payload)
+        except Exception:  # noqa: BLE001
+            pass
+
     def generate(self, prompt: str, schema=None, **kwargs):
         self.calls += 1
-        result = self.adapter.generate(
-            GenerationRequest(
-                model_id=self.model_id,
-                messages=[{"role": "user", "content": prompt}],
-                parameters=self.parameters,
+        started_at = datetime.now(timezone.utc)
+        started = time.monotonic()
+        result = None
+        try:
+            result = self.adapter.generate(
+                GenerationRequest(
+                    model_id=self.model_id,
+                    messages=[{"role": "user", "content": prompt}],
+                    parameters=self.parameters,
+                )
             )
-        )
+        except Exception:
+            self._notify(
+                result=None,
+                prompt=prompt,
+                error={
+                    "category": "provider_error",
+                    "message": "The judge provider call failed unexpectedly.",
+                },
+                started_at=started_at,
+                ended_at=datetime.now(timezone.utc),
+                duration_ms=round((time.monotonic() - started) * 1000, 2),
+            )
+            raise
+        finally:
+            if result is not None:
+                self._notify(
+                    result=result,
+                    prompt=prompt,
+                    error=result.error
+                    or (
+                        {
+                            "category": "invalid_response",
+                            "message": "The judge model returned no content.",
+                        }
+                        if not result.content
+                        else None
+                    ),
+                    started_at=started_at,
+                    ended_at=datetime.now(timezone.utc),
+                    duration_ms=round((time.monotonic() - started) * 1000, 2),
+                )
+
         if result.error or not result.content:
             message = (result.error or {}).get("message") or "The judge model returned no content."
             raise JudgeError(str(message)[:300])
@@ -84,11 +138,16 @@ class ProviderJudge(DeepEvalBaseLLM):
         return [self.generate(prompt) for prompt in prompts]
 
 
-def build_judge(provider, model_id: str, parameters: dict[str, Any] | None = None) -> ProviderJudge:
+def build_judge(
+    provider,
+    model_id: str,
+    parameters: dict[str, Any] | None = None,
+    on_call: Callable[..., None] | None = None,
+) -> ProviderJudge:
     """Create a judge from a provider config using the M3 adapter factory."""
     from apps.providers.services import adapter_for
 
-    return ProviderJudge(adapter_for(provider), model_id, parameters)
+    return ProviderJudge(adapter_for(provider), model_id, parameters, on_call=on_call)
 
 
 def dumps(value: Any) -> str:

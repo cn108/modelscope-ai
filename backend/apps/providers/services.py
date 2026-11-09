@@ -1,5 +1,7 @@
 """Provider configuration services; secrets never leave these services."""
 
+import time
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
@@ -14,6 +16,7 @@ from common.encryption.service import SecretCryptoError
 from common.exceptions import ServiceUnavailable
 from integrations.providers.adapters import OllamaAdapter, ZaiAdapter
 from integrations.providers.http import ProviderRequestError
+from integrations.telemetry.tracing import model_call_span
 
 
 def _project_for_user(user, project_id, minimum_role=Membership.Role.VIEWER):
@@ -154,33 +157,98 @@ def clean_provider_error(exc: Exception) -> dict[str, str]:
     }
 
 
+def generate_observed(*, provider, model_id, messages, parameters):
+    """Run one generation and return ``(result, error, timing)``.
+
+    Timing exists so the observability layer can persist a real trace and span
+    tree without guessing or re-running the provider call. The provider call is
+    also wrapped in an OpenTelemetry client span; its trace id is returned for
+    correlation when a collector is configured.
+    """
+    from integrations.providers.base import GenerationRequest
+
+    started_at = timezone.now()
+    timing: dict = {
+        "started_at": started_at,
+        "prepare_ms": None,
+        "generate_started_at": None,
+        "generate_ms": None,
+        "ended_at": None,
+        "duration_ms": None,
+        "otel_trace_id": "",
+    }
+
+    prepare_started = time.monotonic()
+    try:
+        adapter = adapter_for(provider)
+    except (ValidationError, ServiceUnavailable, ValueError) as exc:
+        timing["prepare_ms"] = round((time.monotonic() - prepare_started) * 1000, 2)
+        ended_at = timezone.now()
+        timing["ended_at"] = ended_at
+        timing["duration_ms"] = round(
+            (ended_at - started_at).total_seconds() * 1000, 2
+        )
+        return None, clean_provider_error(exc), timing
+    timing["prepare_ms"] = round((time.monotonic() - prepare_started) * 1000, 2)
+    timing["generate_started_at"] = timezone.now()
+
+    result = None
+    error = None
+    generate_started = time.monotonic()
+    try:
+        with model_call_span(
+            "provider.generate",
+            attributes={
+                "gen_ai.provider.name": provider.kind,
+                "gen_ai.request.model": model_id,
+            },
+        ) as span:
+            try:
+                result = adapter.generate(
+                    GenerationRequest(
+                        model_id=model_id, messages=messages, parameters=parameters
+                    )
+                )
+            except Exception:  # noqa: BLE001 - never leak SDK/transport details
+                error = {
+                    "category": "provider_error",
+                    "message": "The provider call failed unexpectedly.",
+                }
+            if error:
+                span.record_error(error)
+            elif result is not None and result.error:
+                span.record_error(result.error)
+            timing["otel_trace_id"] = span.trace_id
+    finally:
+        generate_ms = round((time.monotonic() - generate_started) * 1000, 2)
+        timing["generate_ms"] = generate_ms
+        ended_at = timezone.now()
+        timing["ended_at"] = ended_at
+        timing["duration_ms"] = round(
+            (ended_at - started_at).total_seconds() * 1000, 2
+        )
+
+    if error is None and result is not None and result.error:
+        error = {
+            "category": str(result.error.get("category", "provider_error"))[:80],
+            "message": str(result.error.get("message", "Provider call failed."))[:400],
+        }
+    return result, error, timing
+
+
 def generate_once(*, provider, model_id, messages, parameters):
     """Run one non-streaming generation through the M3 adapter.
 
     Returns ``(result, error)`` where exactly one is ``None``. Shared by the
     evaluation runner so it never bypasses the provider integration layer.
     """
-    from integrations.providers.base import GenerationRequest
-
-    try:
-        adapter = adapter_for(provider)
-    except (ValidationError, ServiceUnavailable, ValueError) as exc:
-        return None, clean_provider_error(exc)
-    try:
-        result = adapter.generate(
-            GenerationRequest(model_id=model_id, messages=messages, parameters=parameters)
-        )
-    except Exception:  # noqa: BLE001 - never leak provider SDK/transport details
-        return None, {
-            "category": "provider_error",
-            "message": "The provider call failed unexpectedly.",
-        }
-    if result.error:
-        return None, {
-            "category": str(result.error.get("category", "provider_error"))[:80],
-            "message": str(result.error.get("message", "Provider call failed."))[:400],
-        }
-    return result, None
+    result, error, _ = generate_observed(
+        provider=provider,
+        model_id=model_id,
+        messages=messages,
+        parameters=parameters,
+    )
+    return result, error
 
 
 @transaction.atomic

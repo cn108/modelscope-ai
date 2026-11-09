@@ -171,12 +171,12 @@ export class ShellComponent {
     { label: 'Playground', path: '/playground', icon: 'play' },
     { label: 'Datasets', path: '/datasets', icon: 'database' },
     { label: 'Evaluations', path: '/evaluations', icon: 'check-circle' },
+    { label: 'Observability', path: '/observability', icon: 'activity' },
   ];
 
   readonly soonItems: SoonItem[] = [
     { label: 'Projects', icon: 'folder' },
     { label: 'Providers', icon: 'plug' },
-    { label: 'Observability', icon: 'activity' },
     { label: 'Security', icon: 'shield' },
     { label: 'Settings', icon: 'gear' },
   ];
