@@ -10,3 +10,4 @@ redis~=5.0
 cryptography~=42.0
 python-dotenv~=1.0
 gunicorn~=21.2
+deepeval~=4.3

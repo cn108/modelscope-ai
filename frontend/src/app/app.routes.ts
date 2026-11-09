@@ -35,6 +35,20 @@ export const routes: Routes = [
             (m) => m.PlaygroundComponent,
           ),
       },
+      {
+        path: 'datasets',
+        loadComponent: () =>
+          import('./features/datasets/datasets.component').then(
+            (m) => m.DatasetsComponent,
+          ),
+      },
+      {
+        path: 'evaluations',
+        loadComponent: () =>
+          import('./features/evaluations/evaluations.component').then(
+            (m) => m.EvaluationsComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

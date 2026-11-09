@@ -72,6 +72,8 @@ INSTALLED_APPS = [
     "apps.providers",
     "apps.prompts",
     "apps.playground",
+    "apps.datasets",
+    "apps.evaluations",
 ]
 
 MIDDLEWARE = [
@@ -190,6 +192,11 @@ CORS_ALLOW_CREDENTIALS = False
 # Key lives outside DB and source control; rotate by adding a new key and
 # re-encrypting (see docs/adr/ADR-0003-secret-encryption.md).
 PROVIDER_SECRET_KEYS = env_list("PROVIDER_SECRET_KEYS")  # Fernet keys, current first
+
+# --- Evaluation metrics -----------------------------------------------------
+# Judge-based metrics (DeepEval) need a configured provider/model to score and
+# are hidden entirely when this flag is off or DeepEval is not installed.
+EVALUATION_JUDGE_METRICS_ENABLED = env_bool("EVALUATION_JUDGE_METRICS_ENABLED", True)
 
 # --- Security hardening (§11) ----------------------------------------------
 SECURE_CONTENT_TYPE_NOSNIFF = True

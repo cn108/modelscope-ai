@@ -1,4 +1,4 @@
-# ModelScope AI — Implementation Plan (Milestones 1–2)
+# ModelScope AI — Implementation Plan (Milestones 1–5)
 
 Date: 2026-11-09 · Baseline: `ModelScope_AI_Coding_Agent_Specification.pdf` v1.0
 
@@ -21,7 +21,11 @@ the corresponding Angular screens. See [Milestone 2 report](milestones/MILESTONE
 Milestone 3 delivered the provider layer (encrypted credentials, Z.ai and local
 Ollama adapters, connection tests) and the shared design system. Milestone 4
 added the playground, execution history and versioned prompts; see
-[MILESTONE-4.md](milestones/MILESTONE-4.md).
+[MILESTONE-4.md](milestones/MILESTONE-4.md). Milestone 5 added datasets with
+validated imports and record management, the metric registry (built-in scorers
+plus DeepEval judge metrics), and Celery-backed evaluations with immutable
+per-case results and repeatable reruns; see
+[MILESTONE-5.md](milestones/MILESTONE-5.md).
 
 ## 3. Environment limitation (documented, not hidden)
 
@@ -65,12 +69,12 @@ docs/{IMPLEMENTATION_PLAN.md, milestones/, adr/}
 |---|---|---|
 | Migrations apply cleanly | `python manage.py migrate --settings=config.settings.test` | pass on SQLite test DB; live PostgreSQL unverified |
 | DB connectivity via health | `pytest tests/test_health.py` | pass |
-| Celery/Redis round trip | `pytest tests/test_health.py` (eager mode) | partial — live Redis/worker not exercised |
-| Backend tests | `pytest` | pass — 37 passed |
-| Frontend builds | `npm run build` | pass |
+| Celery/Redis round trip | `pytest tests/test_health.py` (eager mode); M5 live check used a real worker over the filesystem broker | partial — real worker exercised; live Redis/PostgreSQL pending a host |
+| Backend tests | `pytest` | pass — 103 passed |
+| Frontend builds | `npx ng build` | pass |
 | No secrets committed | `git ls-files` + secret grep scan | pass — no `.env` tracked |
 | README and `.env.example` | file existence | partial — `.env.example` added; full README outstanding |
-| CI workflow | `.github/workflows/` | **outstanding** |
+| CI workflow | `.github/workflows/ci.yml` | present — Django and Angular jobs, green on `main` |
 
 ## 7. Milestone status
 
@@ -101,3 +105,13 @@ Status: **complete against its exit criteria** — single and two-model runs,
 per-model metrics and failure isolation, execution history with rerun, saved
 prompts with append-only versions and restore, and immutable execution
 snapshots. Full report: [MILESTONE-4.md](milestones/MILESTONE-4.md).
+
+### Milestone 5 — Datasets and evaluation
+
+Status: **complete against its exit criteria** — dataset CRUD with validated
+JSON/JSONL/CSV imports and record management, a metric registry (three built-in
+reference metrics plus DeepEval answer relevancy, faithfulness and contextual
+relevancy), Celery-backed runs with queued/running/completed/failed status,
+per-case result persistence, aggregate summaries, model comparison and
+repeatable reruns against frozen snapshots. Full report:
+[MILESTONE-5.md](milestones/MILESTONE-5.md).

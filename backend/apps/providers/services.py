@@ -132,6 +132,57 @@ def adapter_for(provider):
     raise ValidationError({"kind": "Unsupported provider type."})
 
 
+def clean_provider_error(exc: Exception) -> dict[str, str]:
+    """Describe a provider failure without echoing secrets or raw payloads."""
+    if isinstance(exc, ValidationError):
+        detail = exc.detail
+        if isinstance(detail, dict):
+            message = "; ".join(
+                f"{key}: {value[0] if isinstance(value, list) and value else value}"
+                for key, value in detail.items()
+            )
+        else:
+            message = str(detail)
+        return {"category": "invalid_provider", "message": message[:400]}
+    if isinstance(exc, ServiceUnavailable):
+        return {"category": "service_unavailable", "message": str(exc.detail)[:400]}
+    if isinstance(exc, ValueError):
+        return {"category": "invalid_request", "message": str(exc)[:400]}
+    return {
+        "category": "provider_error",
+        "message": "The provider call failed unexpectedly.",
+    }
+
+
+def generate_once(*, provider, model_id, messages, parameters):
+    """Run one non-streaming generation through the M3 adapter.
+
+    Returns ``(result, error)`` where exactly one is ``None``. Shared by the
+    evaluation runner so it never bypasses the provider integration layer.
+    """
+    from integrations.providers.base import GenerationRequest
+
+    try:
+        adapter = adapter_for(provider)
+    except (ValidationError, ServiceUnavailable, ValueError) as exc:
+        return None, clean_provider_error(exc)
+    try:
+        result = adapter.generate(
+            GenerationRequest(model_id=model_id, messages=messages, parameters=parameters)
+        )
+    except Exception:  # noqa: BLE001 - never leak provider SDK/transport details
+        return None, {
+            "category": "provider_error",
+            "message": "The provider call failed unexpectedly.",
+        }
+    if result.error:
+        return None, {
+            "category": str(result.error.get("category", "provider_error"))[:80],
+            "message": str(result.error.get("message", "Provider call failed."))[:400],
+        }
+    return result, None
+
+
 @transaction.atomic
 def test_provider(*, actor, provider_id):
     provider = _provider_for_user(actor, provider_id, Membership.Role.ADMIN)

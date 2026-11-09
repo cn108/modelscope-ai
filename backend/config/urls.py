@@ -7,6 +7,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
 from apps.playground.views import ExecutionViewSet
+from apps.datasets.views import DatasetRecordViewSet, DatasetViewSet
+from apps.evaluations.views import EvaluationMetricCatalogView, EvaluationViewSet
 from apps.projects.views import ProjectViewSet
 from apps.prompts.views import PromptViewSet
 from apps.providers.views import ProviderViewSet
@@ -19,6 +21,9 @@ router.register("projects", ProjectViewSet, basename="project")
 router.register("providers", ProviderViewSet, basename="provider")
 router.register("prompts", PromptViewSet, basename="prompt")
 router.register("executions", ExecutionViewSet, basename="execution")
+router.register("datasets", DatasetViewSet, basename="dataset")
+router.register("dataset-records", DatasetRecordViewSet, basename="dataset-record")
+router.register("evaluations", EvaluationViewSet, basename="evaluation")
 
 
 def api_not_found(request, exception=None):
@@ -38,6 +43,11 @@ def api_not_found(request, exception=None):
 api_v1_patterns = [
     path("health/", HealthView.as_view(), name="health"),
     path("health/worker/", WorkerHealthView.as_view(), name="health-worker"),
+    path(
+        "evaluation-metrics/",
+        EvaluationMetricCatalogView.as_view(),
+        name="evaluation-metrics",
+    ),
     path("auth/", include("apps.accounts.urls")),
     path("", include(router.urls)),
 ]
