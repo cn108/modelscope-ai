@@ -1,4 +1,4 @@
-# ModelScope AI — Implementation Plan (Milestones 1–6)
+# ModelScope AI — Implementation Plan (Milestones 1–8)
 
 Date: 2026-11-09 · Baseline: `ModelScope_AI_Coding_Agent_Specification.pdf` v1.0
 
@@ -29,6 +29,15 @@ per-case results and repeatable reruns; see
 traces and spans on the existing playground and evaluation paths, latency and
 token metrics, explicit cost estimates, a filterable observability dashboard
 and a trace explorer; see [MILESTONE-6.md](milestones/MILESTONE-6.md).
+Milestone 7 added controlled security scans over existing datasets, prompts
+and playground executions, redacted PII/injection/unsafe-output findings, a
+review workflow and security dashboard; see
+[MILESTONE-7.md](milestones/MILESTONE-7.md). Milestone 8 added a
+workspace-scoped analytics dashboard over existing execution, trace,
+evaluation and security records, provider/model/date filtering, model
+performance history and comparison, honest cost reporting, and reproducible
+report snapshots with CSV and PDF exports; see
+[MILESTONE-8.md](milestones/MILESTONE-8.md).
 
 ## 3. Environment limitation (documented, not hidden)
 
@@ -56,7 +65,7 @@ backend/
   config/settings/{base,dev,prod,test}.py, urls.py, wsgi.py, asgi.py, celery.py
   apps/{accounts,workspaces,projects}/          # implemented in M1–M2
   apps/{providers,models_registry,prompts,playground,datasets,evaluations,
-        observability,security_scans,analytics}/  # M3+
+        observability,security,analytics}/  # M3+
   integrations/providers/  integrations/evaluation/  integrations/telemetry/
   common/{encryption,exceptions,pagination,permissions,audit}/
   tests/  manage.py  requirements/*.txt  Dockerfile
@@ -73,7 +82,7 @@ docs/{IMPLEMENTATION_PLAN.md, milestones/, adr/}
 | Migrations apply cleanly | `python manage.py migrate --settings=config.settings.test` | pass on SQLite test DB; live PostgreSQL unverified |
 | DB connectivity via health | `pytest tests/test_health.py` | pass |
 | Celery/Redis round trip | `pytest tests/test_health.py` (eager mode); M5/M6 live checks used a real worker over the filesystem broker | partial — real worker exercised; live Redis/PostgreSQL pending a host |
-| Backend tests | `pytest` | pass — 120 passed |
+| Backend tests | `pytest` | pass — 143 passed |
 | Frontend builds | `npx ng build` | pass |
 | Frontend specs | `npx ng test --watch=false --browsers=ChromeHeadless` | pass — 21 specs |
 | No secrets committed | `git ls-files` + secret grep scan | pass — no `.env` tracked |
@@ -132,3 +141,26 @@ back from both the API and the Angular UI. Completed days are also aggregated
 into daily rollups by a scheduled maintenance task, and raw trace retention is
 configurable; the dashboard reads rollups for old days and raw traces for the
 live edge. Full report: [MILESTONE-6.md](milestones/MILESTONE-6.md).
+
+### Milestone 7 — Security
+
+Status: **complete against its exit criteria** — controlled scans ran against
+real dataset, prompt and playground execution records; PII, prompt-injection
+and unsafe-output findings were persisted with redacted evidence, severity,
+remediation and history; findings were reviewed in the Angular UI; a scan
+comparison view shows new, no-longer-detected and persisting detections; and
+previous scans remain available for inspection. Detection is explicitly
+documented as heuristic, with false positives and false negatives expected, and
+scans do not interrupt normal execution. Full report: [MILESTONE-7.md](milestones/MILESTONE-7.md).
+
+### Milestone 8 — Analytics and reporting
+
+Status: **complete against its exit criteria** — the dashboard derives real
+activity from Playground executions, observability traces/rollups, evaluations
+and security records; date, provider, model and source filters were exercised
+against the live API and UI; reports preserve their period, filters and scope
+as snapshots; and valid CSV and PDF exports were downloaded and inspected.
+Costs remain explicitly unavailable or partial when pricing or token data is
+missing rather than being shown as zero. The Angular analytics page includes
+trends, model comparison, cost breakdowns, evaluation/security history and
+report generation. Full report: [MILESTONE-8.md](milestones/MILESTONE-8.md).

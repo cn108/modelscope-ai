@@ -14,6 +14,22 @@ from apps.observability.views import (
     ProjectTraceListView,
     TraceDetailView,
 )
+from apps.security.views import (
+    ProjectSecurityCompareView,
+    ProjectSecurityDashboardView,
+    ProjectSecurityFindingView,
+    ProjectSecurityScanView,
+    SecurityCheckCatalogView,
+    SecurityFindingViewSet,
+    SecurityScanViewSet,
+)
+from apps.analytics.views import (
+    AnalyticsReportDetailView,
+    AnalyticsReportExportView,
+    ProjectAnalyticsReportView,
+    ProjectAnalyticsView,
+    ProjectModelPerformanceView,
+)
 from apps.projects.views import ProjectViewSet
 from apps.prompts.views import PromptViewSet
 from apps.providers.views import ProviderViewSet
@@ -29,6 +45,8 @@ router.register("executions", ExecutionViewSet, basename="execution")
 router.register("datasets", DatasetViewSet, basename="dataset")
 router.register("dataset-records", DatasetRecordViewSet, basename="dataset-record")
 router.register("evaluations", EvaluationViewSet, basename="evaluation")
+router.register("security-scans", SecurityScanViewSet, basename="security-scan")
+router.register("security-findings", SecurityFindingViewSet, basename="security-finding")
 
 
 def api_not_found(request, exception=None):
@@ -54,6 +72,31 @@ api_v1_patterns = [
         name="evaluation-metrics",
     ),
     path(
+        "projects/<uuid:project_id>/analytics/",
+        ProjectAnalyticsView.as_view(),
+        name="project-analytics",
+    ),
+    path(
+        "projects/<uuid:project_id>/analytics/models/",
+        ProjectModelPerformanceView.as_view(),
+        name="project-model-performance",
+    ),
+    path(
+        "projects/<uuid:project_id>/analytics/reports/",
+        ProjectAnalyticsReportView.as_view(),
+        name="project-analytics-reports",
+    ),
+    path(
+        "analytics-reports/<uuid:report_id>/",
+        AnalyticsReportDetailView.as_view(),
+        name="analytics-report",
+    ),
+    path(
+        "analytics-reports/<uuid:report_id>/export/",
+        AnalyticsReportExportView.as_view(),
+        name="analytics-report-export",
+    ),
+    path(
         "projects/<uuid:project_id>/observability/",
         ProjectObservabilityView.as_view(),
         name="project-observability",
@@ -67,6 +110,31 @@ api_v1_patterns = [
         "observability/traces/<uuid:trace_id>/",
         TraceDetailView.as_view(),
         name="observability-trace",
+    ),
+    path(
+        "security/checks/",
+        SecurityCheckCatalogView.as_view(),
+        name="security-checks",
+    ),
+    path(
+        "projects/<uuid:project_id>/security/",
+        ProjectSecurityDashboardView.as_view(),
+        name="project-security",
+    ),
+    path(
+        "projects/<uuid:project_id>/security/scans/",
+        ProjectSecurityScanView.as_view(),
+        name="project-security-scans",
+    ),
+    path(
+        "projects/<uuid:project_id>/security/findings/",
+        ProjectSecurityFindingView.as_view(),
+        name="project-security-findings",
+    ),
+    path(
+        "projects/<uuid:project_id>/security/compare/",
+        ProjectSecurityCompareView.as_view(),
+        name="project-security-compare",
     ),
     path("auth/", include("apps.accounts.urls")),
     path("", include(router.urls)),

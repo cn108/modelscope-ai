@@ -63,6 +63,20 @@ export const routes: Routes = [
             (m) => m.TraceDetailComponent,
           ),
       },
+      {
+        path: 'security',
+        loadComponent: () =>
+          import('./features/security/security.component').then(
+            (m) => m.SecurityComponent,
+          ),
+      },
+      {
+        path: 'analytics',
+        loadComponent: () =>
+          import('./features/analytics/analytics.component').then(
+            (m) => m.AnalyticsComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

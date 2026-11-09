@@ -4,6 +4,7 @@ export type IconName =
   | 'activity'
   | 'alert'
   | 'arrow-right'
+  | 'chart'
   | 'check'
   | 'check-circle'
   | 'clock'
@@ -34,6 +35,7 @@ const ICONS: Record<IconName, string> = {
   alert:
     'M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z',
   'arrow-right': 'M5 12h14m0 0-6-6m6 6-6 6',
+  chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   check: 'M20 6 9 17l-5-5',
   'check-circle': 'M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
   clock: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',

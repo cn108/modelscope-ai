@@ -75,6 +75,8 @@ INSTALLED_APPS = [
     "apps.datasets",
     "apps.evaluations",
     "apps.observability",
+    "apps.security",
+    "apps.analytics",
 ]
 
 MIDDLEWARE = [
@@ -219,6 +221,10 @@ OBSERVABILITY_ROLLUP_ENABLED = env_bool("OBSERVABILITY_ROLLUP_ENABLED", True)
 OBSERVABILITY_TRACE_RETENTION_DAYS = int(
     env("OBSERVABILITY_TRACE_RETENTION_DAYS", "0") or 0
 )
+
+# Security scans are explicit and asynchronous. A scan is capped so a very large
+# dataset cannot occupy a worker indefinitely; the limit is visible in the API.
+SECURITY_MAX_SCAN_ITEMS = int(env("SECURITY_MAX_SCAN_ITEMS", "10000") or 10000)
 
 if OBSERVABILITY_ROLLUP_ENABLED:
     from celery.schedules import crontab
