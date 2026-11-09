@@ -54,7 +54,8 @@ storage.
 | OTLP collector | collector + exported span | collector received `provider.generate` with attributes |
 | Production Compose | `docker compose -f infrastructure/docker-compose.prod.yml config --quiet` | pass |
 | Production static build | prod image `collectstatic --noinput` | 154 files copied; volume owned by `appuser` |
-| Browser journey | `npm run e2e` against the Docker stack | **1 passed (25.7s)** after the final backend/frontend rebuild |
+| Browser journey | `npm run e2e` against the Docker stack | **1 passed (22.0s)** locally after the locator fix; the same journey passed in GitHub Actions |
+| GitHub Actions | push of the final README commit (`d30b132`) | **3/3 jobs passed**: Django, Angular and full browser journey |
 
 ### Restore-drill note
 
@@ -90,8 +91,6 @@ server major version to avoid that warning.
   it was not deployed to a real domain with TLS, a proxy and managed secrets.
 - **Queued-task redelivery under arbitrary broker failure**: restart/health behavior was
   tested; exactly-once delivery is not claimed and Celery does not provide it.
-- **GitHub Actions execution**: the workflow is complete, but it cannot be executed from
-  this local workspace. CI results should be confirmed on the first push.
 
 ## Pull request status
 
