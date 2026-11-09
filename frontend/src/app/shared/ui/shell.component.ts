@@ -169,15 +169,16 @@ export class ShellComponent {
     { label: 'Dashboard', path: '/dashboard', icon: 'grid' },
     { label: 'Workspaces', path: '/workspaces', icon: 'layers' },
     { label: 'Playground', path: '/playground', icon: 'play' },
+    { label: 'Datasets', path: '/datasets', icon: 'database' },
+    { label: 'Evaluations', path: '/evaluations', icon: 'check-circle' },
+    { label: 'Observability', path: '/observability', icon: 'activity' },
+    { label: 'Security', path: '/security', icon: 'shield' },
+    { label: 'Analytics', path: '/analytics', icon: 'chart' },
   ];
 
   readonly soonItems: SoonItem[] = [
     { label: 'Projects', icon: 'folder' },
     { label: 'Providers', icon: 'plug' },
-    { label: 'Datasets', icon: 'database' },
-    { label: 'Evaluations', icon: 'check-circle' },
-    { label: 'Observability', icon: 'activity' },
-    { label: 'Security', icon: 'shield' },
     { label: 'Settings', icon: 'gear' },
   ];
 

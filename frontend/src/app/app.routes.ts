@@ -35,6 +35,48 @@ export const routes: Routes = [
             (m) => m.PlaygroundComponent,
           ),
       },
+      {
+        path: 'datasets',
+        loadComponent: () =>
+          import('./features/datasets/datasets.component').then(
+            (m) => m.DatasetsComponent,
+          ),
+      },
+      {
+        path: 'evaluations',
+        loadComponent: () =>
+          import('./features/evaluations/evaluations.component').then(
+            (m) => m.EvaluationsComponent,
+          ),
+      },
+      {
+        path: 'observability',
+        loadComponent: () =>
+          import('./features/observability/observability.component').then(
+            (m) => m.ObservabilityComponent,
+          ),
+      },
+      {
+        path: 'observability/traces/:id',
+        loadComponent: () =>
+          import('./features/observability/trace-detail.component').then(
+            (m) => m.TraceDetailComponent,
+          ),
+      },
+      {
+        path: 'security',
+        loadComponent: () =>
+          import('./features/security/security.component').then(
+            (m) => m.SecurityComponent,
+          ),
+      },
+      {
+        path: 'analytics',
+        loadComponent: () =>
+          import('./features/analytics/analytics.component').then(
+            (m) => m.AnalyticsComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

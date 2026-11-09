@@ -72,6 +72,11 @@ INSTALLED_APPS = [
     "apps.providers",
     "apps.prompts",
     "apps.playground",
+    "apps.datasets",
+    "apps.evaluations",
+    "apps.observability",
+    "apps.security",
+    "apps.analytics",
 ]
 
 MIDDLEWARE = [
@@ -191,6 +196,46 @@ CORS_ALLOW_CREDENTIALS = False
 # re-encrypting (see docs/adr/ADR-0003-secret-encryption.md).
 PROVIDER_SECRET_KEYS = env_list("PROVIDER_SECRET_KEYS")  # Fernet keys, current first
 
+# --- Evaluation metrics -----------------------------------------------------
+# Judge-based metrics (DeepEval) need a configured provider/model to score and
+# are hidden entirely when this flag is off or DeepEval is not installed.
+EVALUATION_JUDGE_METRICS_ENABLED = env_bool("EVALUATION_JUDGE_METRICS_ENABLED", True)
+
+# --- Observability / OpenTelemetry (M6) ------------------------------------
+# Database traces always record. OTel spans are created in-process; an OTLP/HTTP
+# endpoint is optional and only exports when explicitly configured.
+OTEL_TRACING_ENABLED = env_bool("OTEL_TRACING_ENABLED", True)
+OTEL_SERVICE_NAME = env("OTEL_SERVICE_NAME", "modelscope-ai")
+OTEL_EXPORTER_OTLP_ENDPOINT = env("OTEL_EXPORTER_OTLP_ENDPOINT")
+
+# Explicit per-model pricing, JSON keyed by "<provider kind>:<model id>".
+# Costs stay unavailable unless this is configured and the provider reports
+# token usage; see integrations/telemetry/pricing.py.
+EXECUTION_PRICING = env("EXECUTION_PRICING", "")
+
+# Completed days are aggregated into TraceRollup so the dashboard does not scan
+# the entire raw trace history. 0 keeps raw traces forever (the safe default);
+# set a positive number to delete raw traces after that many complete days.
+# Rollups are retained regardless of raw-trace retention.
+OBSERVABILITY_ROLLUP_ENABLED = env_bool("OBSERVABILITY_ROLLUP_ENABLED", True)
+OBSERVABILITY_TRACE_RETENTION_DAYS = int(
+    env("OBSERVABILITY_TRACE_RETENTION_DAYS", "0") or 0
+)
+
+# Security scans are explicit and asynchronous. A scan is capped so a very large
+# dataset cannot occupy a worker indefinitely; the limit is visible in the API.
+SECURITY_MAX_SCAN_ITEMS = int(env("SECURITY_MAX_SCAN_ITEMS", "10000") or 10000)
+
+if OBSERVABILITY_ROLLUP_ENABLED:
+    from celery.schedules import crontab
+
+    CELERY_BEAT_SCHEDULE = {
+        "observability-maintenance": {
+            "task": "apps.observability.maintain",
+            "schedule": crontab(minute=15, hour=1),
+        }
+    }
+
 # --- Security hardening (§11) ----------------------------------------------
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
@@ -208,15 +253,19 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "trace_id": {"()": "integrations.telemetry.logging.TraceIdFilter"},
+    },
     "formatters": {
         "simple": {
-            "format": "%(levelname)s %(asctime)s %(name)s %(message)s",
+            "format": "%(levelname)s %(asctime)s %(name)s trace=%(trace_id)s %(message)s",
         },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "simple",
+            "filters": ["trace_id"],
         },
     },
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},

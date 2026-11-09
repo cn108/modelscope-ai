@@ -8,6 +8,15 @@ from apps.workspaces.models import Membership
 from apps.workspaces.permissions import require_membership
 
 
+def project_for_user(user, project_id, minimum_role=Membership.Role.VIEWER) -> Project:
+    """Resolve a project the caller may see, or raise 404/403."""
+    project = Project.objects.select_related("workspace").filter(pk=project_id).first()
+    if project is None:
+        raise NotFound("Project not found.")
+    require_membership(user, project.workspace_id, minimum_role)
+    return project
+
+
 def projects_for_user(user):
     """Projects in workspaces the user belongs to, regardless of role."""
     return (

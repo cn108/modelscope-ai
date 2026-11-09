@@ -5,6 +5,15 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.datasets.serializers import DatasetCreateSerializer, DatasetSerializer
+from apps.datasets.services import create_dataset, get_dataset, list_datasets
+from apps.evaluations.serializers import EvaluationCreateSerializer, EvaluationSerializer
+from apps.evaluations.services import (
+    create_evaluation,
+    enqueue_evaluation,
+    evaluation_detail,
+    list_evaluations,
+)
 from apps.playground.serializers import ExecutionCreateSerializer, ExecutionSerializer
 from apps.playground.services import create_execution, list_executions
 from apps.prompts.serializers import PromptCreateSerializer, PromptSerializer
@@ -149,3 +158,45 @@ class ProjectViewSet(
 
         executions = list_executions(user=request.user, project_id=project.pk)
         return Response(ExecutionSerializer(executions, many=True).data)
+
+    @action(detail=True, methods=["get", "post"], url_path="datasets")
+    def datasets(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "POST":
+            serializer = DatasetCreateSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            dataset = create_dataset(
+                actor=request.user,
+                project_id=project.pk,
+                validated_data=serializer.validated_data,
+            )
+            dataset = get_dataset(user=request.user, dataset_id=dataset.pk)
+            return Response(
+                DatasetSerializer(dataset).data, status=status.HTTP_201_CREATED
+            )
+
+        datasets = list_datasets(user=request.user, project_id=project.pk)
+        return Response(DatasetSerializer(datasets, many=True).data)
+
+    @action(detail=True, methods=["get", "post"], url_path="evaluations")
+    def evaluations(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "POST":
+            serializer = EvaluationCreateSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            evaluation = create_evaluation(
+                actor=request.user,
+                project_id=project.pk,
+                validated_data=serializer.validated_data,
+            )
+            evaluation = enqueue_evaluation(evaluation)
+            evaluation = evaluation_detail(
+                user=request.user, evaluation_id=evaluation.pk
+            )
+            return Response(
+                EvaluationSerializer(evaluation).data,
+                status=status.HTTP_201_CREATED,
+            )
+
+        evaluations = list_evaluations(user=request.user, project_id=project.pk)
+        return Response(EvaluationSerializer(evaluations, many=True).data)

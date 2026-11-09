@@ -1,4 +1,4 @@
-# ModelScope AI — Implementation Plan (Milestones 1–2)
+# ModelScope AI — Implementation Plan (Milestones 1–8)
 
 Date: 2026-11-09 · Baseline: `ModelScope_AI_Coding_Agent_Specification.pdf` v1.0
 
@@ -21,7 +21,23 @@ the corresponding Angular screens. See [Milestone 2 report](milestones/MILESTONE
 Milestone 3 delivered the provider layer (encrypted credentials, Z.ai and local
 Ollama adapters, connection tests) and the shared design system. Milestone 4
 added the playground, execution history and versioned prompts; see
-[MILESTONE-4.md](milestones/MILESTONE-4.md).
+[MILESTONE-4.md](milestones/MILESTONE-4.md). Milestone 5 added datasets with
+validated imports and record management, the metric registry (built-in scorers
+plus DeepEval judge metrics), and Celery-backed evaluations with immutable
+per-case results and repeatable reruns; see
+[MILESTONE-5.md](milestones/MILESTONE-5.md). Milestone 6 added execution
+traces and spans on the existing playground and evaluation paths, latency and
+token metrics, explicit cost estimates, a filterable observability dashboard
+and a trace explorer; see [MILESTONE-6.md](milestones/MILESTONE-6.md).
+Milestone 7 added controlled security scans over existing datasets, prompts
+and playground executions, redacted PII/injection/unsafe-output findings, a
+review workflow and security dashboard; see
+[MILESTONE-7.md](milestones/MILESTONE-7.md). Milestone 8 added a
+workspace-scoped analytics dashboard over existing execution, trace,
+evaluation and security records, provider/model/date filtering, model
+performance history and comparison, honest cost reporting, and reproducible
+report snapshots with CSV and PDF exports; see
+[MILESTONE-8.md](milestones/MILESTONE-8.md).
 
 ## 3. Environment limitation (documented, not hidden)
 
@@ -40,7 +56,7 @@ The Docker CLI is present, but the daemon is **not reachable from this developme
 3. SimpleJWT is used for authentication; JWT signing follows the runtime `SECRET_KEY`.
 4. Provider credential encryption helper (Fernet, key from env) lands in `common/encryption` early;
    the key never enters source control.
-5. Sentry/OTLP exporter endpoints stay unconfigured by default; OpenTelemetry wiring remains Milestone 6.
+5. Sentry/OTLP exporter endpoints stay unconfigured by default. OpenTelemetry wiring is present as of Milestone 6: database traces always record, and OTLP/HTTP export is opt-in through `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ## 5. Initial directory structure
 
@@ -49,7 +65,7 @@ backend/
   config/settings/{base,dev,prod,test}.py, urls.py, wsgi.py, asgi.py, celery.py
   apps/{accounts,workspaces,projects}/          # implemented in M1–M2
   apps/{providers,models_registry,prompts,playground,datasets,evaluations,
-        observability,security_scans,analytics}/  # M3+
+        observability,security,analytics}/  # M3+
   integrations/providers/  integrations/evaluation/  integrations/telemetry/
   common/{encryption,exceptions,pagination,permissions,audit}/
   tests/  manage.py  requirements/*.txt  Dockerfile
@@ -65,12 +81,13 @@ docs/{IMPLEMENTATION_PLAN.md, milestones/, adr/}
 |---|---|---|
 | Migrations apply cleanly | `python manage.py migrate --settings=config.settings.test` | pass on SQLite test DB; live PostgreSQL unverified |
 | DB connectivity via health | `pytest tests/test_health.py` | pass |
-| Celery/Redis round trip | `pytest tests/test_health.py` (eager mode) | partial — live Redis/worker not exercised |
-| Backend tests | `pytest` | pass — 37 passed |
-| Frontend builds | `npm run build` | pass |
+| Celery/Redis round trip | `pytest tests/test_health.py` (eager mode); M5/M6 live checks used a real worker over the filesystem broker | partial — real worker exercised; live Redis/PostgreSQL pending a host |
+| Backend tests | `pytest` | pass — 143 passed |
+| Frontend builds | `npx ng build` | pass |
+| Frontend specs | `npx ng test --watch=false --browsers=ChromeHeadless` | pass — 21 specs |
 | No secrets committed | `git ls-files` + secret grep scan | pass — no `.env` tracked |
 | README and `.env.example` | file existence | partial — `.env.example` added; full README outstanding |
-| CI workflow | `.github/workflows/` | **outstanding** |
+| CI workflow | `.github/workflows/ci.yml` | present — Django and Angular jobs, green on `main` |
 
 ## 7. Milestone status
 
@@ -101,3 +118,49 @@ Status: **complete against its exit criteria** — single and two-model runs,
 per-model metrics and failure isolation, execution history with rerun, saved
 prompts with append-only versions and restore, and immutable execution
 snapshots. Full report: [MILESTONE-4.md](milestones/MILESTONE-4.md).
+
+### Milestone 5 — Datasets and evaluation
+
+Status: **complete against its exit criteria** — dataset CRUD with validated
+JSON/JSONL/CSV imports and record management, a metric registry (three built-in
+reference metrics plus DeepEval answer relevancy, faithfulness and contextual
+relevancy), Celery-backed runs with queued/running/completed/failed status,
+per-case result persistence, aggregate summaries, model comparison and
+repeatable reruns against frozen snapshots. Full report:
+[MILESTONE-5.md](milestones/MILESTONE-5.md).
+
+### Milestone 6 — Observability
+
+Status: **complete against its exit criteria** — execution traces and span
+trees are written from real Playground, Evaluation and judge calls; the
+dashboard aggregates latency, tokens, failures, model/provider usage and
+explicitly configured estimated costs; the trace explorer resolves the linked
+execution or evaluation and displays its spans, request, response and errors.
+The live check ran 4 real calls through a Celery worker and read the records
+back from both the API and the Angular UI. Completed days are also aggregated
+into daily rollups by a scheduled maintenance task, and raw trace retention is
+configurable; the dashboard reads rollups for old days and raw traces for the
+live edge. Full report: [MILESTONE-6.md](milestones/MILESTONE-6.md).
+
+### Milestone 7 — Security
+
+Status: **complete against its exit criteria** — controlled scans ran against
+real dataset, prompt and playground execution records; PII, prompt-injection
+and unsafe-output findings were persisted with redacted evidence, severity,
+remediation and history; findings were reviewed in the Angular UI; a scan
+comparison view shows new, no-longer-detected and persisting detections; and
+previous scans remain available for inspection. Detection is explicitly
+documented as heuristic, with false positives and false negatives expected, and
+scans do not interrupt normal execution. Full report: [MILESTONE-7.md](milestones/MILESTONE-7.md).
+
+### Milestone 8 — Analytics and reporting
+
+Status: **complete against its exit criteria** — the dashboard derives real
+activity from Playground executions, observability traces/rollups, evaluations
+and security records; date, provider, model and source filters were exercised
+against the live API and UI; reports preserve their period, filters and scope
+as snapshots; and valid CSV and PDF exports were downloaded and inspected.
+Costs remain explicitly unavailable or partial when pricing or token data is
+missing rather than being shown as zero. The Angular analytics page includes
+trends, model comparison, cost breakdowns, evaluation/security history and
+report generation. Full report: [MILESTONE-8.md](milestones/MILESTONE-8.md).

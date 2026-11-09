@@ -4,18 +4,10 @@ from django.db import transaction
 from django.db.models import Max
 from rest_framework.exceptions import NotFound, PermissionDenied
 
-from apps.projects.models import Project
+from apps.projects.services import project_for_user  # noqa: F401 - re-exported for callers
 from apps.prompts.models import Prompt, PromptVersion
 from apps.workspaces.models import Membership
 from apps.workspaces.permissions import require_membership
-
-
-def project_for_user(user, project_id, minimum_role=Membership.Role.VIEWER) -> Project:
-    project = Project.objects.select_related("workspace").filter(pk=project_id).first()
-    if project is None:
-        raise NotFound("Project not found.")
-    require_membership(user, project.workspace_id, minimum_role)
-    return project
 
 
 def prompt_for_user(user, prompt_id, minimum_role=Membership.Role.VIEWER) -> Prompt:
