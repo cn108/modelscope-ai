@@ -3,6 +3,95 @@
 @tailwind utilities;
 
 /* Global styles for ModelScope AI */
-body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+
+@layer base {
+  body {
+    @apply bg-canvas text-ink antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand/40 ring-offset-1 ring-offset-white;
+  }
+}
+
+@layer components {
+  .msa-page {
+    @apply mx-auto w-full max-w-[1400px] px-5 py-6 sm:px-8 sm:py-8;
+  }
+
+  .msa-card {
+    @apply rounded-2xl border border-line bg-white shadow-card;
+  }
+
+  .msa-card-header {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4;
+  }
+
+  .msa-h1 {
+    @apply text-2xl font-semibold tracking-tight text-ink;
+  }
+
+  .msa-sub {
+    @apply mt-1 text-sm text-muted;
+  }
+
+  .msa-btn-base {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .msa-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .msa-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .msa-btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-canvas hover:text-ink disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .msa-icon-btn {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-white text-muted transition-colors hover:bg-canvas hover:text-ink disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .msa-input {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20;
+  }
+
+  .msa-input-error {
+    @apply border-rose-300 focus:border-rose-400 focus:ring-rose-100;
+  }
+
+  .msa-label {
+    @apply mb-1.5 block text-xs font-medium text-muted;
+  }
+
+  .msa-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+
+  .msa-th {
+    @apply whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400;
+  }
+
+  .msa-td {
+    @apply px-4 py-3 align-middle text-sm text-slate-600;
+  }
+
+  .msa-row {
+    @apply border-t border-line/70;
+  }
+
+  .msa-skeleton {
+    @apply animate-pulse rounded-md bg-slate-100;
+  }
+
+  .msa-section-title {
+    @apply text-sm font-semibold text-ink;
+  }
+
+  .msa-tile {
+    @apply flex h-9 w-9 items-center justify-center rounded-xl text-sm font-semibold;
+  }
 }

@@ -7,12 +7,14 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
 from apps.projects.views import ProjectViewSet
+from apps.providers.views import ProviderViewSet
 from apps.workspaces.views import WorkspaceViewSet
 from common.health.views import HealthView, WorkerHealthView
 
 router = DefaultRouter()
 router.register("workspaces", WorkspaceViewSet, basename="workspace")
 router.register("projects", ProjectViewSet, basename="project")
+router.register("providers", ProviderViewSet, basename="provider")
 
 
 def api_not_found(request, exception=None):

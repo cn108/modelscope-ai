@@ -1,9 +1,12 @@
 """Project API (specification §8: /projects)."""
 
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.providers.serializers import ProviderConfigSerializer, ProviderCreateSerializer
+from apps.providers.services import create_provider, list_providers
 from apps.projects.serializers import (
     ProjectCreateSerializer,
     ProjectSerializer,
@@ -81,3 +84,22 @@ class ProjectViewSet(
         project = self.get_object()
         delete_project(user=request.user, project=project)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get", "post"], url_path="providers")
+    def providers(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "POST":
+            serializer = ProviderCreateSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            provider = create_provider(
+                actor=request.user,
+                project_id=project.pk,
+                validated_data=serializer.validated_data,
+            )
+            return Response(
+                ProviderConfigSerializer(provider).data,
+                status=status.HTTP_201_CREATED,
+            )
+
+        providers = list_providers(user=request.user, project_id=project.pk)
+        return Response(ProviderConfigSerializer(providers, many=True).data)
