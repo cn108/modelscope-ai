@@ -1,12 +1,29 @@
 import { Routes } from '@angular/router';
 
-import { DashboardComponent } from './features/dashboard/dashboard.component';
+import { authGuard } from './core/guards/auth.guard';
 
-/**
- * Feature routes are lazy-loaded per specification section 6.
- * Feature modules arrive with milestones 2-8; dashboard verifies the API seam now.
- */
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', component: DashboardComponent },
-  // e.g. { path: 'workspaces', loadChildren: () => import('./features/workspaces/routes').then(m => m.ROUTES) }
+  {
+    path: 'login',
+    loadComponent: () =>
+      import('./features/auth/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'workspaces',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/workspaces/workspaces.component').then(
+        (m) => m.WorkspacesComponent,
+      ),
+  },
+  {
+    path: 'status',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/dashboard/dashboard.component').then(
+        (m) => m.DashboardComponent,
+      ),
+  },
+  { path: '', pathMatch: 'full', redirectTo: 'workspaces' },
+  { path: '**', redirectTo: '' },
 ];
