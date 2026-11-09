@@ -5,6 +5,14 @@ from rest_framework.exceptions import APIException
 from rest_framework.views import exception_handler
 
 
+class ServiceUnavailable(APIException):
+    """HTTP 503 when a server-side dependency or configuration is missing."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = "The service is temporarily unavailable."
+    default_code = "service_unavailable"
+
+
 class Conflict(APIException):
     """HTTP 409 for uniqueness conflicts that are not validation errors."""
 

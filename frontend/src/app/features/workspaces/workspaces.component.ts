@@ -10,12 +10,13 @@ import {
   WorkspaceRole,
 } from '../../shared/models/workspace.model';
 import { ProjectService } from '../projects/project.service';
+import { ProviderManagerComponent } from '../providers/provider-manager.component';
 import { WorkspaceService } from './workspace.service';
 
 @Component({
   selector: 'msa-workspaces',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ProviderManagerComponent],
   template: `
     <main class="mx-auto max-w-6xl p-6">
       <div class="flex flex-wrap items-end justify-between gap-4">
@@ -123,12 +124,20 @@ import { WorkspaceService } from './workspace.service';
                       <li
                         class="rounded-md border border-slate-100 px-3 py-2 text-sm"
                       >
-                        <span class="font-medium">{{ project.name }}</span>
-                        @if (project.description) {
-                          <span class="block text-xs text-slate-500">
-                            {{ project.description }}
-                          </span>
-                        }
+                        <div class="flex items-start justify-between gap-3">
+                          <div>
+                            <span class="font-medium">{{ project.name }}</span>
+                            @if (project.description) {
+                              <span class="block text-xs text-slate-500">
+                                {{ project.description }}
+                              </span>
+                            }
+                          </div>
+                          <details class="min-w-0 flex-1 pl-3">
+                            <summary class="cursor-pointer text-xs text-slate-600 hover:text-slate-900">Providers</summary>
+                            <msa-provider-manager [projectId]="project.id" [canManage]="canManage" />
+                          </details>
+                        </div>
                       </li>
                     } @empty {
                       <li class="text-sm text-slate-400">No projects yet.</li>
