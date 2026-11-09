@@ -76,6 +76,9 @@ server major version to avoid that warning.
 - The frontend nginx now gzip-compresses JavaScript/CSS/JSON, which keeps large bundles intact
   on slow or bandwidth-limited links (including temporary tunnels) and reduces transfer size.
 - The CI Playwright job installed the browser before `npm ci`; the order is now correct.
+- The browser journey's Datasets assertion could match both the page title and the panel
+  heading once data loaded. It now uses an exact level-1 heading locator, removing the
+  load-order flake that surfaced on the first GitHub Actions run.
 
 ### What remains unverified
 

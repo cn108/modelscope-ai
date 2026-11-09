@@ -167,7 +167,9 @@ test('full browser acceptance journey', async ({ page }) => {
 
   await test.step('create, edit and import dataset records', async () => {
     await mainNav.getByRole('link', { name: 'Datasets' }).click();
-    await expect(page.getByRole('heading', { name: 'Datasets' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Datasets', exact: true, level: 1 }),
+    ).toBeVisible();
 
     await page.getByLabel('New dataset name').fill(datasetName);
     await page.getByLabel('New dataset description').fill('Playwright acceptance cases');
