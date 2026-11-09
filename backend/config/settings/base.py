@@ -226,6 +226,11 @@ OBSERVABILITY_TRACE_RETENTION_DAYS = int(
 # dataset cannot occupy a worker indefinitely; the limit is visible in the API.
 SECURITY_MAX_SCAN_ITEMS = int(env("SECURITY_MAX_SCAN_ITEMS", "10000") or 10000)
 
+# AI security testing is bounded so an authorised workspace member cannot turn
+# the reviewed case catalog into an unbounded model-call or cost surface.
+SECURITY_TEST_MAX_MODELS = int(env("SECURITY_TEST_MAX_MODELS", "5") or 5)
+SECURITY_TEST_MAX_RESULTS = int(env("SECURITY_TEST_MAX_RESULTS", "120") or 120)
+
 if OBSERVABILITY_ROLLUP_ENABLED:
     from celery.schedules import crontab
 

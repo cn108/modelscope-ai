@@ -28,6 +28,8 @@ from .models import (
     SecurityFindingEvent,
     SecurityScan,
     SecuritySeverity,
+    SecurityTestResult,
+    SecurityTestRun,
 )
 from .targets import ScanSegment, collect_segments, resolve_target
 
@@ -575,6 +577,10 @@ def dashboard(*, user, project_id) -> dict:
     project = _project(user, project_id)
     scans = SecurityScan.objects.filter(project=project)
     findings = SecurityFinding.objects.filter(project=project)
+    test_runs = SecurityTestRun.objects.filter(project=project)
+    test_results = SecurityTestResult.objects.filter(run__project=project).exclude(
+        status=SecurityTestResult.Status.PENDING
+    )
     severity_counts = {
         row["severity"]: row["count"]
         for row in findings.values("severity").annotate(count=Count("id"))
@@ -622,6 +628,17 @@ def dashboard(*, user, project_id) -> dict:
         ).count(),
         "blocking_findings": findings.filter(
             disposition=SecurityDisposition.BLOCKING
+        ).count(),
+        "security_test_runs": test_runs.count(),
+        "security_tests": test_results.count(),
+        "security_tests_failed": test_results.filter(
+            verdict=SecurityTestResult.Verdict.FAILED
+        ).count(),
+        "security_test_runs_running": test_runs.filter(
+            status__in=[
+                SecurityTestRun.Status.QUEUED,
+                SecurityTestRun.Status.RUNNING,
+            ]
         ).count(),
         "severity_counts": severity_counts,
         "status_counts": status_counts,

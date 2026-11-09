@@ -244,3 +244,168 @@ class SecurityFindingEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.finding_id}: {self.from_status or 'detected'} -> {self.to_status}"
+
+
+class SecurityTestRun(models.Model):
+    """One controlled adversarial test run against configured project models."""
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        "projects.Project", on_delete=models.CASCADE, related_name="security_test_runs"
+    )
+    case_keys = models.JSONField(default=list, blank=True)
+    categories = models.JSONField(default=list, blank=True)
+    parameters = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.QUEUED
+    )
+    total_models = models.PositiveSmallIntegerField(default=0)
+    total_cases = models.PositiveSmallIntegerField(default=0)
+    total_results = models.PositiveIntegerField(default=0)
+    completed_results = models.PositiveIntegerField(default=0)
+    summary = models.JSONField(default=dict, blank=True)
+    error = models.JSONField(null=True, blank=True)
+    task_id = models.CharField(max_length=200, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="security_test_runs",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "security_test_run"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["project", "created_at"]),
+            models.Index(fields=["project", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Security test run {self.pk} ({self.status})"
+
+
+class SecurityTestModel(models.Model):
+    """One model selection and its progress within a test run."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        COMPLETED = "completed", "Completed"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    run = models.ForeignKey(
+        SecurityTestRun, on_delete=models.CASCADE, related_name="models"
+    )
+    position = models.PositiveSmallIntegerField()
+    provider = models.ForeignKey(
+        "providers.ProviderConfig",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="security_test_models",
+    )
+    provider_name = models.CharField(max_length=120)
+    provider_kind = models.CharField(max_length=16)
+    model_id = models.CharField(max_length=200)
+    parameters = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING
+    )
+    summary = models.JSONField(default=dict, blank=True)
+    error = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "security_test_model"
+        ordering = ["position"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["run", "position"], name="uniq_security_test_model_position"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.provider_name}:{self.model_id}"
+
+
+class SecurityTestResult(models.Model):
+    """One actual model response classified against one reviewed attack case."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+
+    class Verdict(models.TextChoices):
+        PASSED = "passed", "Passed"
+        FAILED = "failed", "Failed"
+        INCONCLUSIVE = "inconclusive", "Inconclusive"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    run = models.ForeignKey(
+        SecurityTestRun, on_delete=models.CASCADE, related_name="results"
+    )
+    model = models.ForeignKey(
+        SecurityTestModel, on_delete=models.CASCADE, related_name="results"
+    )
+    case_key = models.CharField(max_length=120)
+    case_name = models.CharField(max_length=240)
+    category = models.CharField(max_length=64)
+    category_label = models.CharField(max_length=120)
+    technique = models.CharField(max_length=160)
+    system_prompt = models.TextField(blank=True)
+    attack_input = models.TextField()
+    detector = models.CharField(max_length=40, blank=True)
+    detector_config = models.JSONField(default=dict, blank=True)
+    response_text = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING
+    )
+    verdict = models.CharField(max_length=16, choices=Verdict.choices, blank=True)
+    severity = models.CharField(
+        max_length=16, choices=SecuritySeverity.choices, blank=True
+    )
+    rationale = models.TextField(blank=True)
+    evidence = models.TextField(blank=True)
+    mitigation = models.TextField(blank=True)
+    criteria = models.TextField(blank=True)
+    matched_rules = models.JSONField(default=list, blank=True)
+    references = models.JSONField(default=list, blank=True)
+    canary = models.CharField(max_length=80, blank=True)
+    duration_ms = models.FloatField(null=True, blank=True)
+    input_tokens = models.PositiveIntegerField(null=True, blank=True)
+    output_tokens = models.PositiveIntegerField(null=True, blank=True)
+    provider_request_id = models.CharField(max_length=200, blank=True)
+    error = models.JSONField(null=True, blank=True)
+    executed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "security_test_result"
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["model", "case_key"], name="uniq_security_test_model_case"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["run", "category"]),
+            models.Index(fields=["model", "verdict"]),
+            models.Index(fields=["run", "verdict"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.case_key} · {self.model} ({self.verdict or self.status})"

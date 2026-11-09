@@ -23,6 +23,15 @@ from apps.security.views import (
     SecurityFindingViewSet,
     SecurityScanViewSet,
 )
+from apps.security.testing_views import (
+    ProjectSecurityTestCompareView,
+    ProjectSecurityTestingDashboardView,
+    ProjectSecurityTestHistoryView,
+    ProjectSecurityTestRunView,
+    SecurityTestCatalogView,
+    SecurityTestResultViewSet,
+    SecurityTestRunViewSet,
+)
 from apps.analytics.views import (
     AnalyticsReportDetailView,
     AnalyticsReportExportView,
@@ -47,6 +56,10 @@ router.register("dataset-records", DatasetRecordViewSet, basename="dataset-recor
 router.register("evaluations", EvaluationViewSet, basename="evaluation")
 router.register("security-scans", SecurityScanViewSet, basename="security-scan")
 router.register("security-findings", SecurityFindingViewSet, basename="security-finding")
+router.register("security-test-runs", SecurityTestRunViewSet, basename="security-test-run")
+router.register(
+    "security-test-results", SecurityTestResultViewSet, basename="security-test-result"
+)
 
 
 def api_not_found(request, exception=None):
@@ -115,6 +128,31 @@ api_v1_patterns = [
         "security/checks/",
         SecurityCheckCatalogView.as_view(),
         name="security-checks",
+    ),
+    path(
+        "security-testing/catalog/",
+        SecurityTestCatalogView.as_view(),
+        name="security-testing-catalog",
+    ),
+    path(
+        "projects/<uuid:project_id>/security-testing/",
+        ProjectSecurityTestingDashboardView.as_view(),
+        name="project-security-testing",
+    ),
+    path(
+        "projects/<uuid:project_id>/security-testing/runs/",
+        ProjectSecurityTestRunView.as_view(),
+        name="project-security-test-runs",
+    ),
+    path(
+        "projects/<uuid:project_id>/security-testing/compare/",
+        ProjectSecurityTestCompareView.as_view(),
+        name="project-security-test-compare",
+    ),
+    path(
+        "projects/<uuid:project_id>/security-testing/history/",
+        ProjectSecurityTestHistoryView.as_view(),
+        name="project-security-test-history",
     ),
     path(
         "projects/<uuid:project_id>/security/",

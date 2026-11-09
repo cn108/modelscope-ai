@@ -1,4 +1,4 @@
-# ModelScope AI — Implementation Plan (Milestones 1–8)
+# ModelScope AI — Implementation Plan (Milestones 1–9)
 
 Date: 2026-11-09 · Baseline: `ModelScope_AI_Coding_Agent_Specification.pdf` v1.0
 
@@ -37,7 +37,11 @@ workspace-scoped analytics dashboard over existing execution, trace,
 evaluation and security records, provider/model/date filtering, model
 performance history and comparison, honest cost reporting, and reproducible
 report snapshots with CSV and PDF exports; see
-[MILESTONE-8.md](milestones/MILESTONE-8.md).
+[MILESTONE-8.md](milestones/MILESTONE-8.md). Milestone 9 added a
+controlled AI security testing engine with reviewed attack cases, actual model
+responses, deterministic pass/fail/inconclusive classification, model and
+historical comparison, and integration with M7 security counts and M8
+analytics/reporting; see [MILESTONE-9.md](milestones/MILESTONE-9.md).
 
 ## 3. Environment limitation (documented, not hidden)
 
@@ -66,7 +70,7 @@ backend/
   apps/{accounts,workspaces,projects}/          # implemented in M1–M2
   apps/{providers,models_registry,prompts,playground,datasets,evaluations,
         observability,security,analytics}/  # M3+
-  integrations/providers/  integrations/evaluation/  integrations/telemetry/
+  integrations/{providers,evaluation,telemetry,security,security_testing,reporting}/
   common/{encryption,exceptions,pagination,permissions,audit}/
   tests/  manage.py  requirements/*.txt  Dockerfile
 frontend/
@@ -82,9 +86,9 @@ docs/{IMPLEMENTATION_PLAN.md, milestones/, adr/}
 | Migrations apply cleanly | `python manage.py migrate --settings=config.settings.test` | pass on SQLite test DB; live PostgreSQL unverified |
 | DB connectivity via health | `pytest tests/test_health.py` | pass |
 | Celery/Redis round trip | `pytest tests/test_health.py` (eager mode); M5/M6 live checks used a real worker over the filesystem broker | partial — real worker exercised; live Redis/PostgreSQL pending a host |
-| Backend tests | `pytest` | pass — 143 passed |
+| Backend tests | `pytest` | pass — 159 passed |
 | Frontend builds | `npx ng build` | pass |
-| Frontend specs | `npx ng test --watch=false --browsers=ChromeHeadless` | pass — 21 specs |
+| Frontend specs | `npx ng test --watch=false --browsers=ChromeHeadless` | pass — 23 specs |
 | No secrets committed | `git ls-files` + secret grep scan | pass — no `.env` tracked |
 | README and `.env.example` | file existence | partial — `.env.example` added; full README outstanding |
 | CI workflow | `.github/workflows/ci.yml` | present — Django and Angular jobs, green on `main` |
@@ -164,3 +168,20 @@ Costs remain explicitly unavailable or partial when pricing or token data is
 missing rather than being shown as zero. The Angular analytics page includes
 trends, model comparison, cost breakdowns, evaluation/security history and
 report generation. Full report: [MILESTONE-8.md](milestones/MILESTONE-8.md).
+
+### Milestone 9 — AI security testing
+
+Status: **implemented, automated-test verified and live-tested against a real
+configured model.** The engine sends reviewed cases across nine attack
+categories to project providers, stores the actual response and classifies it
+only against explicit criteria. Pass, fail and inconclusive are kept distinct,
+provider errors are inconclusive, canaries and redacted evidence support
+inspection, and reruns preserve history. The Angular page supports model/case
+selection, progress, result inspection, model comparison, reruns and historical
+comparison. M7 security counts and M8 analytics/reports include the new results
+without duplicating their stores. Live acceptance used Ollama `0.40.13` with
+`llama3.2:1b` in the preview project: all 18 cases ran with 18 actual responses,
+0 provider errors, 14 passed, 3 failed and 1 inconclusive. Reviewing the stored
+responses exposed and fixed a quoted-marker false positive and a refusal
+phrasing gap; a clean rerun and historical comparison confirmed the correction.
+Full report: [MILESTONE-9.md](milestones/MILESTONE-9.md).
