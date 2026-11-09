@@ -17,6 +17,7 @@ export interface ProviderConfig {
   connection_detail: string;
   last_tested_at: string | null;
   has_secret: boolean;
+  models: { id: string; model_id: string; display_name: string }[];
   created_at: string;
   updated_at: string;
 }

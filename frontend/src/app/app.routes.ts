@@ -28,6 +28,13 @@ export const routes: Routes = [
             (m) => m.WorkspacesComponent,
           ),
       },
+      {
+        path: 'playground',
+        loadComponent: () =>
+          import('./features/playground/playground.component').then(
+            (m) => m.PlaygroundComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

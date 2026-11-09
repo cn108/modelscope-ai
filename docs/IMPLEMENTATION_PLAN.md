@@ -18,7 +18,10 @@ Milestone 2 delivered identity and tenancy: registration/login/refresh/me, works
 memberships with four roles, projects, server-side RBAC, cross-tenant isolation, audit events and
 the corresponding Angular screens. See [Milestone 2 report](milestones/MILESTONE-2.md).
 
-Work should stop for review before Milestone 3 (provider layer). Milestone 3 has not been started.
+Milestone 3 delivered the provider layer (encrypted credentials, Z.ai and local
+Ollama adapters, connection tests) and the shared design system. Milestone 4
+added the playground, execution history and versioned prompts; see
+[MILESTONE-4.md](milestones/MILESTONE-4.md).
 
 ## 3. Environment limitation (documented, not hidden)
 
@@ -88,4 +91,13 @@ Status: **complete against its exit criterion** — permission and cross-tenant 
 
 ### Milestone 3 — Provider layer
 
-Status: **not started** (encrypted provider credentials, adapters, connection tests).
+Status: **code complete and merged** — encrypted provider credentials, Z.ai and
+Ollama adapters, connection/model endpoints and the redesigned UI. Live Z.ai
+verification still requires a user-supplied API key.
+
+### Milestone 4 — Playground
+
+Status: **complete against its exit criteria** — single and two-model runs,
+per-model metrics and failure isolation, execution history with rerun, saved
+prompts with append-only versions and restore, and immutable execution
+snapshots. Full report: [MILESTONE-4.md](milestones/MILESTONE-4.md).

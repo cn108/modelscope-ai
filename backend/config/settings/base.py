@@ -70,6 +70,8 @@ INSTALLED_APPS = [
     "apps.workspaces",
     "apps.projects",
     "apps.providers",
+    "apps.prompts",
+    "apps.playground",
 ]
 
 MIDDLEWARE = [
