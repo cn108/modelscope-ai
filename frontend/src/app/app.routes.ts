@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
+import { ShellComponent } from './shared/ui/shell.component';
 
 export const routes: Routes = [
   {
@@ -9,21 +10,27 @@ export const routes: Routes = [
       import('./features/auth/login.component').then((m) => m.LoginComponent),
   },
   {
-    path: 'workspaces',
+    path: '',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/workspaces/workspaces.component').then(
-        (m) => m.WorkspacesComponent,
-      ),
+    component: ShellComponent,
+    children: [
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard.component').then(
+            (m) => m.DashboardComponent,
+          ),
+      },
+      {
+        path: 'workspaces',
+        loadComponent: () =>
+          import('./features/workspaces/workspaces.component').then(
+            (m) => m.WorkspacesComponent,
+          ),
+      },
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+    ],
   },
-  {
-    path: 'status',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/dashboard/dashboard.component').then(
-        (m) => m.DashboardComponent,
-      ),
-  },
-  { path: '', pathMatch: 'full', redirectTo: 'workspaces' },
+  { path: 'status', redirectTo: 'dashboard' },
   { path: '**', redirectTo: '' },
 ];
