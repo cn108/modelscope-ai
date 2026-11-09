@@ -9,3 +9,11 @@ def run_security_scan(self, scan_id: str) -> dict:
 
     task_id = getattr(self.request, "id", "") or ""
     return execute_scan(scan_id=scan_id, task_id=task_id)
+
+
+@shared_task(bind=True, name="apps.security.run_security_test")
+def run_security_test(self, run_id: str) -> dict:
+    from .testing_services import execute_run
+
+    task_id = getattr(self.request, "id", "") or ""
+    return execute_run(run_id=run_id, task_id=task_id)

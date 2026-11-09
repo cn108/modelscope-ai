@@ -125,6 +125,15 @@ interface TargetOption {
           </p>
         </section>
 
+        <a
+          routerLink="/security-testing"
+          class="msa-card mt-3 flex flex-wrap items-center gap-3 border-brand/20 bg-brand-soft/40 p-3 text-xs text-slate-700 transition-colors hover:border-brand/40"
+        >
+          <msa-icon name="shield" [size]="15" class="text-brand" />
+          <span><strong>AI security testing:</strong> {{ data.security_tests }} test attempts, {{ data.security_tests_failed }} failed, {{ data.security_test_runs }} runs.</span>
+          <span class="ml-auto inline-flex items-center gap-1 font-medium text-brand">Open testing <msa-icon name="arrow-right" [size]="13" /></span>
+        </a>
+
         <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <article class="msa-card p-5">
             <p class="text-xs font-medium text-muted">Security scans</p>

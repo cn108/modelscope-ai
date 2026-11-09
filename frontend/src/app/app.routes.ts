@@ -71,6 +71,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'security-testing',
+        loadComponent: () =>
+          import('./features/security-testing/security-testing.component').then(
+            (m) => m.SecurityTestingComponent,
+          ),
+      },
+      {
         path: 'analytics',
         loadComponent: () =>
           import('./features/analytics/analytics.component').then(

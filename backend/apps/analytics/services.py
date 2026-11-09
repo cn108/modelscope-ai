@@ -43,14 +43,18 @@ from apps.security.models import (
     SecurityFinding,
     SecurityScan,
     SecuritySeverity,
+    SecurityTestResult,
+    SecurityTestRun,
 )
 from apps.workspaces.models import Membership
 
 DEFAULT_WINDOW_DAYS = 30
 SOURCES = {"playground", "evaluation"}
 SECURITY_NOTE = (
-    "Security counts cover every scan target detected in the reporting period; "
-    "provider and model filters do not apply to dataset or prompt scans."
+    "Security counts cover every scan and AI security test detected in the "
+    "reporting period; provider and model filters do not apply to dataset or "
+    "prompt scans. AI test results are model-specific and are counted for the "
+    "selected period."
 )
 EVALUATION_SCORE_NOTE = (
     "The evaluation score is the mean of available stored metric averages. "
@@ -500,6 +504,16 @@ def _security_data(project, filters: AnalyticsFilters) -> dict:
         detected_at__gte=filters.start_at,
         detected_at__lt=filters.end_before,
     )
+    test_runs = SecurityTestRun.objects.filter(
+        project=project,
+        created_at__gte=filters.start_at,
+        created_at__lt=filters.end_before,
+    )
+    test_results = SecurityTestResult.objects.filter(
+        run__project=project,
+        run__created_at__gte=filters.start_at,
+        run__created_at__lt=filters.end_before,
+    ).exclude(status=SecurityTestResult.Status.PENDING)
     scan_status = {
         row["status"]: int(row["count"])
         for row in scans.values("status").annotate(count=Count("id"))
@@ -508,6 +522,30 @@ def _security_data(project, filters: AnalyticsFilters) -> dict:
         row["status"]: int(row["count"])
         for row in findings.values("status").annotate(count=Count("id"))
     }
+    test_run_status = {
+        row["status"]: int(row["count"])
+        for row in test_runs.values("status").annotate(count=Count("id"))
+    }
+    test_verdicts = {
+        row["verdict"]: int(row["count"])
+        for row in test_results.values("verdict").annotate(count=Count("id"))
+    }
+    test_severity_counts = {value: 0 for value, _ in SecuritySeverity.choices}
+    for row in test_results.filter(verdict=SecurityTestResult.Verdict.FAILED).values(
+        "severity"
+    ).annotate(count=Count("id")):
+        if row["severity"]:
+            test_severity_counts[row["severity"]] = int(row["count"])
+    test_categories = [
+        {
+            "category": row["category"],
+            "label": row["category_label"],
+            "count": int(row["count"]),
+        }
+        for row in test_results.values("category", "category_label")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:6]
+    ]
     severity_counts = {
         value: 0 for value, _ in SecuritySeverity.choices
     }
@@ -546,6 +584,19 @@ def _security_data(project, filters: AnalyticsFilters) -> dict:
         .values("day")
         .annotate(count=Count("id"))
     }
+    test_daily = {
+        row["day"].isoformat(): int(row["count"])
+        for row in test_results.annotate(day=TruncDate("executed_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+    }
+    test_failed_daily = {
+        row["day"].isoformat(): int(row["count"])
+        for row in test_results.filter(verdict=SecurityTestResult.Verdict.FAILED)
+        .annotate(day=TruncDate("executed_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+    }
     return {
         "scans": sum(scan_status.values()),
         "completed_scans": scan_status.get(SecurityScan.Status.COMPLETED, 0),
@@ -558,9 +609,26 @@ def _security_data(project, filters: AnalyticsFilters) -> dict:
         "resolved_findings": finding_status.get(SecurityFinding.Status.RESOLVED, 0),
         "severity_counts": severity_counts,
         "categories": categories,
+        "test_runs": sum(test_run_status.values()),
+        "completed_test_runs": test_run_status.get(
+            SecurityTestRun.Status.COMPLETED, 0
+        ),
+        "failed_test_runs": test_run_status.get(SecurityTestRun.Status.FAILED, 0),
+        "running_test_runs": test_run_status.get(SecurityTestRun.Status.RUNNING, 0)
+        + test_run_status.get(SecurityTestRun.Status.QUEUED, 0),
+        "tests_performed": sum(test_verdicts.values()),
+        "tests_passed": test_verdicts.get(SecurityTestResult.Verdict.PASSED, 0),
+        "tests_failed": test_verdicts.get(SecurityTestResult.Verdict.FAILED, 0),
+        "tests_inconclusive": test_verdicts.get(
+            SecurityTestResult.Verdict.INCONCLUSIVE, 0
+        ),
+        "test_severity_counts": test_severity_counts,
+        "test_categories": test_categories,
         "recent_scans": recent,
         "daily_scans": scan_daily,
         "daily_findings": finding_daily,
+        "daily_tests": test_daily,
+        "daily_test_failures": test_failed_daily,
         "note": SECURITY_NOTE,
     }
 
@@ -608,6 +676,8 @@ def _daily_points(
             "avg_evaluation_score": None,
             "security_scans": 0,
             "security_findings": 0,
+            "security_tests": 0,
+            "security_test_failures": 0,
         }
         current += timedelta(days=1)
 
@@ -668,6 +738,20 @@ def _daily_points(
             point = None
         if point:
             point["security_findings"] = count
+    for day, count in security["daily_tests"].items():
+        try:
+            point = points.get(date.fromisoformat(day))
+        except (TypeError, ValueError):
+            point = None
+        if point:
+            point["security_tests"] = count
+    for day, count in security["daily_test_failures"].items():
+        try:
+            point = points.get(date.fromisoformat(day))
+        except (TypeError, ValueError):
+            point = None
+        if point:
+            point["security_test_failures"] = count
     return [points[day] for day in sorted(points)]
 
 
@@ -764,6 +848,16 @@ def dashboard(*, user, project_id, params) -> dict:
             "resolved_findings",
             "severity_counts",
             "categories",
+            "test_runs",
+            "completed_test_runs",
+            "failed_test_runs",
+            "running_test_runs",
+            "tests_performed",
+            "tests_passed",
+            "tests_failed",
+            "tests_inconclusive",
+            "test_severity_counts",
+            "test_categories",
             "recent_scans",
             "note",
         )

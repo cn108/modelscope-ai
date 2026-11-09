@@ -184,6 +184,10 @@ export interface SecurityDashboard {
   reviewed_findings: number;
   resolved_findings: number;
   blocking_findings: number;
+  security_test_runs: number;
+  security_tests: number;
+  security_tests_failed: number;
+  security_test_runs_running: number;
   severity_counts: Record<string, number>;
   status_counts: Record<string, number>;
   disposition_counts: Record<string, number>;

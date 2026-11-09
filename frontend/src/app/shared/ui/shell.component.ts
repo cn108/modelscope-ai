@@ -173,6 +173,7 @@ export class ShellComponent {
     { label: 'Evaluations', path: '/evaluations', icon: 'check-circle' },
     { label: 'Observability', path: '/observability', icon: 'activity' },
     { label: 'Security', path: '/security', icon: 'shield' },
+    { label: 'AI Testing', path: '/security-testing', icon: 'shield' },
     { label: 'Analytics', path: '/analytics', icon: 'chart' },
   ];
 

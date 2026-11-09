@@ -280,11 +280,33 @@ def _security_rows(data: dict) -> list[tuple[str, str]]:
         ("Open findings", _number(security.get("open_findings"))),
         ("Reviewed findings", _number(security.get("reviewed_findings"))),
         ("Resolved findings", _number(security.get("resolved_findings"))),
+        ("AI security test runs", _number(security.get("test_runs"))),
+        ("Completed AI test runs", _number(security.get("completed_test_runs"))),
+        ("AI security tests performed", _number(security.get("tests_performed"))),
+        ("AI tests passed", _number(security.get("tests_passed"))),
+        ("AI tests failed", _number(security.get("tests_failed"))),
+        ("AI tests inconclusive", _number(security.get("tests_inconclusive"))),
         (
             "Severity counts",
             ", ".join(
                 f"{key}: {value}"
                 for key, value in (security.get("severity_counts") or {}).items()
+            )
+            or "None",
+        ),
+        (
+            "AI test severity counts",
+            ", ".join(
+                f"{key}: {value}"
+                for key, value in (security.get("test_severity_counts") or {}).items()
+            )
+            or "None",
+        ),
+        (
+            "AI test attack categories",
+            ", ".join(
+                f"{item.get('category')}: {item.get('count')}"
+                for item in security.get("test_categories") or []
             )
             or "None",
         ),
@@ -325,7 +347,9 @@ def _trend_rows(data: dict) -> list[tuple[str, str]]:
             f"{_number(point.get('output_tokens'))} output tokens; "
             f"{_number(point.get('executions'))} executions; "
             f"{_number(point.get('evaluations'))} evaluations; "
-            f"{_number(point.get('security_findings'))} security findings",
+            f"{_number(point.get('security_findings'))} security findings; "
+            f"{_number(point.get('security_tests'))} AI security tests; "
+            f"{_number(point.get('security_test_failures'))} AI test failures",
         )
         for point in trend
     ]

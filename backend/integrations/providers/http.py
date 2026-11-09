@@ -32,7 +32,7 @@ def request_json(*, url: str, method: str = "GET", payload=None, api_key: str | 
         _NoRedirect(),
     )
     try:
-        with opener.open(request, timeout=20) as response:
+        with opener.open(request, timeout=60) as response:
             raw = response.read(2_000_001)
     except urllib.error.HTTPError as exc:
         code = exc.code
