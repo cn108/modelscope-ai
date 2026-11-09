@@ -168,12 +168,12 @@ export class ShellComponent {
   readonly navItems: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'grid' },
     { label: 'Workspaces', path: '/workspaces', icon: 'layers' },
+    { label: 'Playground', path: '/playground', icon: 'play' },
   ];
 
   readonly soonItems: SoonItem[] = [
     { label: 'Projects', icon: 'folder' },
     { label: 'Providers', icon: 'plug' },
-    { label: 'Playground', icon: 'play' },
     { label: 'Datasets', icon: 'database' },
     { label: 'Evaluations', icon: 'check-circle' },
     { label: 'Observability', icon: 'activity' },

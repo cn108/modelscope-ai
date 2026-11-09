@@ -5,6 +5,10 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.playground.serializers import ExecutionCreateSerializer, ExecutionSerializer
+from apps.playground.services import create_execution, list_executions
+from apps.prompts.serializers import PromptCreateSerializer, PromptSerializer
+from apps.prompts.services import create_prompt, list_prompts
 from apps.providers.serializers import ProviderConfigSerializer, ProviderCreateSerializer
 from apps.providers.services import create_provider, list_providers
 from apps.projects.serializers import (
@@ -103,3 +107,45 @@ class ProjectViewSet(
 
         providers = list_providers(user=request.user, project_id=project.pk)
         return Response(ProviderConfigSerializer(providers, many=True).data)
+
+    @action(detail=True, methods=["get", "post"], url_path="prompts")
+    def prompts(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "POST":
+            serializer = PromptCreateSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            prompt = create_prompt(
+                actor=request.user,
+                project_id=project.pk,
+                validated_data=serializer.validated_data,
+            )
+            from apps.prompts.services import get_prompt
+
+            prompt = get_prompt(user=request.user, prompt_id=prompt.pk)
+            return Response(
+                PromptSerializer(prompt).data, status=status.HTTP_201_CREATED
+            )
+
+        prompts = list_prompts(user=request.user, project_id=project.pk)
+        return Response(PromptSerializer(prompts, many=True).data)
+
+    @action(detail=True, methods=["get", "post"], url_path="executions")
+    def executions(self, request, pk=None):
+        project = self.get_object()
+        if request.method == "POST":
+            serializer = ExecutionCreateSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            execution = create_execution(
+                actor=request.user,
+                project_id=project.pk,
+                validated_data=serializer.validated_data,
+            )
+            from apps.playground.services import execution_for_user
+
+            execution = execution_for_user(request.user, execution.pk)
+            return Response(
+                ExecutionSerializer(execution).data, status=status.HTTP_201_CREATED
+            )
+
+        executions = list_executions(user=request.user, project_id=project.pk)
+        return Response(ExecutionSerializer(executions, many=True).data)

@@ -16,6 +16,7 @@ ALLOWED_DEFAULTS = {
 
 class ProviderConfigSerializer(serializers.ModelSerializer):
     has_secret = serializers.SerializerMethodField()
+    models = serializers.SerializerMethodField()
 
     class Meta:
         model = ProviderConfig
@@ -30,6 +31,7 @@ class ProviderConfigSerializer(serializers.ModelSerializer):
             "connection_detail",
             "last_tested_at",
             "has_secret",
+            "models",
             "created_at",
             "updated_at",
         ]
@@ -45,6 +47,17 @@ class ProviderConfigSerializer(serializers.ModelSerializer):
 
     def get_has_secret(self, obj) -> bool:
         return hasattr(obj, "secret")
+
+    def get_models(self, obj) -> list[dict]:
+        """Known model ids, readable by any workspace member for the playground."""
+        return [
+            {
+                "id": str(model.id),
+                "model_id": model.model_id,
+                "display_name": model.display_name,
+            }
+            for model in obj.models.all()
+        ]
 
     def validate_settings(self, value):
         if not isinstance(value, dict):
